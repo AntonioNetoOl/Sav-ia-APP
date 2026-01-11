@@ -1,4 +1,6 @@
+// src/screens/verifyEmailScreen.js
 import { Ionicons } from "@expo/vector-icons";
+import { Asset } from "expo-asset";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
@@ -36,8 +38,26 @@ const LOGO_TOP = height * 0.065;
 const RESEND_SECONDS = 30;
 
 export default function VerifyEmailScreen({ navigation, route }) {
-  const emailParam  = route?.params?.email || "";
+  const emailParam = route?.params?.email || "";
   const alreadySent = !!route?.params?.alreadySent;
+
+  // Mitigação: pré-carregar asset do watermark
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const asset = Asset.fromModule(require("../../assets/Logo-savoia.png"));
+        await asset.downloadAsync();
+      } catch {
+        // fallback silencioso
+      } finally {
+        if (!alive) return;
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!emailParam) {
@@ -51,8 +71,11 @@ export default function VerifyEmailScreen({ navigation, route }) {
   useEffect(() => {
     Animated.timing(enterAnim, { toValue: 1, duration: 420, useNativeDriver: true }).start();
   }, [enterAnim]);
+
   const cardTranslateY = enterAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] });
   const cardOpacity = enterAnim;
+
+  const wmScaleEnter = enterAnim.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] });
 
   const breathe = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -65,18 +88,18 @@ export default function VerifyEmailScreen({ navigation, route }) {
     loop.start();
     return () => loop.stop();
   }, [breathe]);
+
   const breatheScale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] });
 
+  // saída ao voltar
   const backAnim = useRef(new Animated.Value(0)).current;
   const handleBack = () => {
     Animated.timing(backAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start(() => {
       navigation.goBack();
     });
   };
-  const backStyle = {
-    opacity: backAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
-    transform: [{ translateX: backAnim.interpolate({ inputRange: [0, 1], outputRange: [0, width * 0.08] }) }],
-  };
+  const exitFade = backAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const exitSlide = backAnim.interpolate({ inputRange: [0, 1], outputRange: [0, width * 0.08] });
 
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
@@ -84,10 +107,11 @@ export default function VerifyEmailScreen({ navigation, route }) {
 
   // Timer de reenvio: usa "cooldown" se vier na navegação; senão, fallback em alreadySent
   const cooldownParam = Number(route?.params?.cooldown);
-  const initialLeft =
-    Number.isFinite(cooldownParam)
-      ? Math.max(0, Math.min(RESEND_SECONDS, cooldownParam))
-      : (alreadySent ? RESEND_SECONDS : 0);
+  const initialLeft = Number.isFinite(cooldownParam)
+    ? Math.max(0, Math.min(RESEND_SECONDS, cooldownParam))
+    : alreadySent
+      ? RESEND_SECONDS
+      : 0;
 
   const [left, setLeft] = useState(initialLeft);
   useEffect(() => {
@@ -108,10 +132,7 @@ export default function VerifyEmailScreen({ navigation, route }) {
       Alert.alert("Tudo certo!", "E-mail verificado com sucesso.");
       navigation.replace("Login", { email: emailParam });
     } catch (e) {
-      const msg =
-        e?.response?.data?.erro ||
-        e?.response?.data?.message ||
-        "Código inválido ou expirado.";
+      const msg = e?.response?.data?.erro || e?.response?.data?.message || "Código inválido ou expirado.";
       setErr(msg);
     } finally {
       setLoading(false);
@@ -124,19 +145,16 @@ export default function VerifyEmailScreen({ navigation, route }) {
       await sendEmailCode({ email: emailParam });
       setLeft(RESEND_SECONDS);
     } catch (e) {
-      Alert.alert(
-        "Ops!",
-        e?.response?.data?.erro || e?.response?.data?.message || "Falha ao reenviar código."
-      );
+      Alert.alert("Ops!", e?.response?.data?.erro || e?.response?.data?.message || "Falha ao reenviar código.");
       setLeft(0);
     }
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: BG }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <StatusBar barStyle="light-content" backgroundColor={BG} />
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1, backgroundColor: BG }}
+        contentContainerStyle={{ flexGrow: 1, backgroundColor: BG, minHeight: height }}
         keyboardShouldPersistTaps="handled"
         overScrollMode="never"
       >
@@ -144,12 +162,29 @@ export default function VerifyEmailScreen({ navigation, route }) {
           <LinearGradient colors={GRADIENT_COLORS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
 
           {/* Watermark */}
-          <View style={styles.watermarkWrap} pointerEvents="none">
-            <Animated.View style={[styles.watermarkClip, { transform: [{ scale: breatheScale }] }]}>
-              <Image source={require("../../assets/Logo-savoia.png")} style={styles.watermarkImage} resizeMode="contain" accessible={false} />
+          <Animated.View
+            style={styles.watermarkWrap}
+            pointerEvents="none"
+            collapsable={false}
+          >
+            <Animated.View
+              style={[
+                styles.watermarkClip,
+                { transform: [{ scale: Animated.multiply(wmScaleEnter, breatheScale) }] },
+              ]}
+              collapsable={false}
+            >
+              <Image
+                key={`wm-verify-${route?.key || "sem-rota"}`}
+                source={require("../../assets/Logo-savoia.png")}
+                style={styles.watermarkImage}
+                resizeMode="contain"
+                accessible={false}
+                fadeDuration={0}
+              />
               <View style={styles.ringMask} />
             </Animated.View>
-          </View>
+          </Animated.View>
 
           {/* voltar */}
           <Pressable style={styles.backBtn} onPress={handleBack} hitSlop={10}>
@@ -157,10 +192,26 @@ export default function VerifyEmailScreen({ navigation, route }) {
           </Pressable>
 
           {/* card */}
-          <Animated.View style={[backStyle, { opacity: cardOpacity, transform: [{ translateY: cardTranslateY }] }]}>
-            <View style={styles.shadowWrap} renderToHardwareTextureAndroid shouldRasterizeIOS>
+          <Animated.View
+            style={{
+              opacity: Animated.multiply(cardOpacity, exitFade),
+              transform: [{ translateY: cardTranslateY }, { translateX: exitSlide }],
+            }}
+          >
+            <View
+              style={styles.shadowWrap}
+              renderToHardwareTextureAndroid={Platform.OS === "android"}
+              // Importante: NÃO usar shouldRasterizeIOS aqui (mesmo bug do “card branco” no iOS).
+            >
               <View style={styles.cardWrap}>
-                <BlurView intensity={30} tint="light" style={StyleSheet.absoluteFill} />
+                <BlurView
+                  intensity={Platform.OS === "ios" ? 18 : 30}
+                  tint={Platform.OS === "ios" ? "dark" : "light"}
+                  style={[StyleSheet.absoluteFill, styles.blurLayer]}
+                  pointerEvents="none"
+                />
+                <View style={styles.blurOverlay} pointerEvents="none" />
+
                 <View style={styles.cardContent}>
                   <Text style={styles.title}>Confirme seu e-mail</Text>
                   <Text style={styles.subtitle}>
@@ -216,16 +267,31 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.12)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.25)",
+    zIndex: 30,
+    elevation: 30,
   },
 
-  watermarkWrap: { position: "absolute", top: LOGO_TOP, alignItems: "center", justifyContent: "center", width: LOGO_SIZE, height: LOGO_SIZE },
+  watermarkWrap: {
+    position: "absolute",
+    top: LOGO_TOP,
+    alignItems: "center",
+    justifyContent: "center",
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    zIndex: 0,
+    ...(Platform.OS === "ios" ? { needsOffscreenAlphaCompositing: true } : null),
+  },
   watermarkClip: { width: "100%", height: "100%", borderRadius: LOGO_SIZE / 2, overflow: "hidden", position: "relative" },
   watermarkImage: { width: "100%", height: "100%", opacity: 0.08, transform: [{ scale: LOGO_SCALE }], alignSelf: "center", backgroundColor: "transparent" },
   ringMask: { ...StyleSheet.absoluteFillObject, borderRadius: LOGO_SIZE / 2, borderWidth: EDGE_HIDE, borderColor: "#072F20", backgroundColor: "transparent" },
 
   shadowWrap: { width: CARD_WIDTH, borderRadius: 18, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 14 },
-  cardWrap: { borderRadius: RADIUS, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", backgroundColor: "rgba(255,255,255,0.16)" },
-  cardContent: { padding: 18 },
+  cardWrap: { borderRadius: RADIUS, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", backgroundColor: Platform.OS === "ios" ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.16)" },
+
+  blurLayer: { zIndex: 0 },
+  blurOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1, backgroundColor: Platform.OS === "ios" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0)" },
+
+  cardContent: { padding: 18, position: "relative", zIndex: 2 },
 
   title: { color: "#fff", fontSize: 18, fontWeight: "900" },
   subtitle: { color: "rgba(255,255,255,0.85)", marginTop: 6, marginBottom: 12, lineHeight: 20, textAlign: "center" },
