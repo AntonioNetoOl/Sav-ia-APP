@@ -1,5 +1,6 @@
 // src/screens/forgotCodeScreen.js
 import { Ionicons } from "@expo/vector-icons";
+import { Asset } from "expo-asset";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
@@ -34,15 +35,33 @@ const LOGO_TOP = height * 0.065;
 export default function ForgotCodeScreen({ route, navigation }) {
   const email = String(route?.params?.email || "").trim().toLowerCase();
 
+  // Mitigação: pré-carregar asset do watermark para reduzir falhas intermitentes de render
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const asset = Asset.fromModule(require("../../assets/Logo-savoia.png"));
+        await asset.downloadAsync();
+      } catch {
+        // fallback silencioso
+      } finally {
+        if (!alive) return;
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // === animações de entrada (card / watermark) ===
   const screenAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(screenAnim, { toValue: 1, duration: 420, useNativeDriver: true }).start();
   }, [screenAnim]);
   const cardTranslateY = screenAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
-  const cardOpacity    = screenAnim;
-  const wmOpacity      = screenAnim;
-  const wmScale        = screenAnim.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] });
+  const cardOpacity = screenAnim;
+  const wmOpacity = screenAnim;
+  const wmScale = screenAnim.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] });
 
   // watermark “respirar”
   const breathe = useRef(new Animated.Value(0)).current;
@@ -64,22 +83,25 @@ export default function ForgotCodeScreen({ route, navigation }) {
 
   // === estado ===
   const [code, setCode] = useState("");
-  const [error, setError] = useState("");        // << estado para mensagens do input
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { left, reset } = useCountdown(60);
 
   // inicia o contador quando abrir
-  useEffect(() => { reset(60); }, [reset]);
+  useEffect(() => {
+    reset(60);
+  }, [reset]);
 
   const handleVerify = async () => {
     if (loading) return;
-    setError("");                                 // limpa antes
-    const normalized = code.replace(/\D/g, "").slice(0, 6);
+    setError("");
 
+    const normalized = code.replace(/\D/g, "").slice(0, 6);
     if (!/^\d{6}$/.test(normalized)) {
-      setError("Digite o código de 6 dígitos."); // mostra no campo
+      setError("Digite o código de 6 dígitos.");
       return;
     }
+
     try {
       setLoading(true);
       const { data } = await forgotVerify(email, normalized);
@@ -87,7 +109,7 @@ export default function ForgotCodeScreen({ route, navigation }) {
       if (!token) throw new Error("Token temporário ausente.");
       navigation.navigate("ForgotReset", { token });
     } catch (err) {
-      const status  = err?.response?.status;
+      const status = err?.response?.status;
       const payload = err?.response?.data || {};
       const msg = payload.erro || payload.message || "Código inválido.";
 
@@ -97,15 +119,18 @@ export default function ForgotCodeScreen({ route, navigation }) {
       else setError(msg);
 
       console.log("forgot_verify_failed", payload || err?.message);
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResend = async () => {
     if (loading || left > 0) return;
-    setError("");                               
+    setError("");
+
     try {
       setLoading(true);
-      await forgotStart(email);     
+      await forgotStart(email);
       reset(60);
       Alert.alert("Reenviado", "Verifique seu e-mail.");
     } catch (err) {
@@ -113,7 +138,9 @@ export default function ForgotCodeScreen({ route, navigation }) {
       const msg = payload.erro || payload.message || "Não foi possível reenviar.";
       setError(msg);
       console.log("forgot_resend_failed", payload || err?.message);
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -121,9 +148,26 @@ export default function ForgotCodeScreen({ route, navigation }) {
       <LinearGradient colors={GRADIENT_COLORS} style={StyleSheet.absoluteFill} />
 
       {/* Watermark */}
-      <Animated.View style={[styles.watermarkWrap, { opacity: wmOpacity }]} pointerEvents="none">
-        <Animated.View style={[styles.watermarkClip, { transform: [{ scale: Animated.multiply(wmScale, breatheScale) }] }]}>
-          <Image source={require("../../assets/Logo-savoia.png")} style={styles.watermarkImage} resizeMode="contain" accessible={false} />
+      <Animated.View
+        style={[styles.watermarkWrap, { opacity: wmOpacity }]}
+        pointerEvents="none"
+        collapsable={false}
+      >
+        <Animated.View
+          style={[
+            styles.watermarkClip,
+            { transform: [{ scale: Animated.multiply(wmScale, breatheScale) }] },
+          ]}
+          collapsable={false}
+        >
+          <Image
+            key={`wm-${route?.key || "sem-rota"}`}
+            source={require("../../assets/Logo-savoia.png")}
+            style={styles.watermarkImage}
+            resizeMode="contain"
+            accessible={false}
+            fadeDuration={0}
+          />
           <View style={styles.ringMask} />
         </Animated.View>
       </Animated.View>
@@ -137,9 +181,20 @@ export default function ForgotCodeScreen({ route, navigation }) {
 
       {/* card */}
       <Animated.View style={{ opacity: cardOpacity, transform: [{ translateY: cardTranslateY }] }}>
-        <View style={styles.shadowWrap} renderToHardwareTextureAndroid shouldRasterizeIOS>
+        <View
+          style={styles.shadowWrap}
+          renderToHardwareTextureAndroid={Platform.OS === "android"}
+          // Importante: NÃO usar shouldRasterizeIOS aqui (pode quebrar o BlurView no iOS).
+        >
           <View style={styles.cardWrap}>
-            <BlurView intensity={30} tint="light" style={StyleSheet.absoluteFill} />
+            <BlurView
+              intensity={Platform.OS === "ios" ? 18 : 30}
+              tint={Platform.OS === "ios" ? "dark" : "light"}
+              style={[StyleSheet.absoluteFill, styles.blurLayer]}
+              pointerEvents="none"
+            />
+            <View style={styles.blurOverlay} pointerEvents="none" />
+
             <View style={styles.cardContent}>
               <Text style={styles.title}>Digite o código enviado</Text>
               <Text style={styles.sub}>{email}</Text>
@@ -148,10 +203,14 @@ export default function ForgotCodeScreen({ route, navigation }) {
                 label="CÓDIGO"
                 placeholder="000000"
                 value={code}
-                onChangeText={(t) => { setError(""); setCode(t.replace(/\D/g, "").slice(0, 6)); }} // limpa erro ao digitar
+                onChangeText={(t) => {
+                  setError("");
+                  setCode(t.replace(/\D/g, "").slice(0, 6));
+                }}
                 keyboardType="number-pad"
-                error={error} // << exibe o erro visualmente
+                error={error}
               />
+
               <SvButton title="Validar" onPress={handleVerify} loading={loading} style={{ marginTop: 16 }} />
 
               <View style={{ marginTop: 12, alignItems: "center" }}>
@@ -170,13 +229,41 @@ export default function ForgotCodeScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:{ flex:1, alignItems:"center", justifyContent:"center", backgroundColor: BG },
+  container: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BG },
 
   // watermark
-  watermarkWrap: { position: "absolute", top: LOGO_TOP, alignItems: "center", justifyContent: "center", width: LOGO_SIZE, height: LOGO_SIZE },
-  watermarkClip: { width: "100%", height: "100%", borderRadius: LOGO_SIZE / 2, overflow: "hidden", position: "relative" },
-  watermarkImage: { width: "100%", height: "100%", opacity: 0.08, transform: [{ scale: LOGO_SCALE }], alignSelf: "center", backgroundColor: "transparent" },
-  ringMask: { ...StyleSheet.absoluteFillObject, borderRadius: LOGO_SIZE / 2, borderWidth: EDGE_HIDE, borderColor: "#072F20", backgroundColor: "transparent" },
+  watermarkWrap: {
+    position: "absolute",
+    top: LOGO_TOP,
+    alignItems: "center",
+    justifyContent: "center",
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    zIndex: 0,
+    ...(Platform.OS === "ios" ? { needsOffscreenAlphaCompositing: true } : null),
+  },
+  watermarkClip: {
+    width: "100%",
+    height: "100%",
+    borderRadius: LOGO_SIZE / 2,
+    overflow: "hidden",
+    position: "relative",
+  },
+  watermarkImage: {
+    width: "100%",
+    height: "100%",
+    opacity: 0.08,
+    transform: [{ scale: LOGO_SCALE }],
+    alignSelf: "center",
+    backgroundColor: "transparent",
+  },
+  ringMask: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: LOGO_SIZE / 2,
+    borderWidth: EDGE_HIDE,
+    borderColor: "#072F20",
+    backgroundColor: "transparent",
+  },
 
   backBtn: {
     position: "absolute",
@@ -191,10 +278,32 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
 
-  shadowWrap:{ width: CARD_WIDTH, borderRadius: RADIUS, shadowColor:"#000", shadowOpacity:.25, shadowRadius:18, shadowOffset:{width:0,height:10}, elevation:14 },
-  cardWrap:{ borderRadius:RADIUS, overflow:"hidden", borderWidth:1, borderColor:"rgba(255,255,255,0.25)", backgroundColor:"rgba(255,255,255,0.16)" },
-  cardContent:{ padding:18 },
+  shadowWrap: {
+    width: CARD_WIDTH,
+    borderRadius: RADIUS,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 14,
+  },
+  cardWrap: {
+    borderRadius: RADIUS,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+    backgroundColor: Platform.OS === "ios" ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.16)",
+  },
 
-  title:{ color:"#fff", fontSize:18, fontWeight:"900" },
-  sub:{ color:"rgba(255,255,255,0.9)", marginTop:6, marginBottom:12 },
+  blurLayer: { zIndex: 0 },
+  blurOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    backgroundColor: Platform.OS === "ios" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0)",
+  },
+
+  cardContent: { padding: 18, position: "relative", zIndex: 2 },
+
+  title: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  sub: { color: "rgba(255,255,255,0.9)", marginTop: 6, marginBottom: 12 },
 });

@@ -1,5 +1,6 @@
 // src/screens/forgotResetScreen.js
 import { Ionicons } from "@expo/vector-icons";
+import { Asset } from "expo-asset";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
@@ -35,6 +36,24 @@ const LOGO_TOP = height * 0.065;
 export default function ForgotResetScreen({ route, navigation }) {
   const token = route?.params?.token || "";
 
+  // Mitigação: pré-carregar asset do watermark para reduzir falhas intermitentes de render
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const asset = Asset.fromModule(require("../../assets/Logo-savoia.png"));
+        await asset.downloadAsync();
+      } catch {
+        // fallback silencioso
+      } finally {
+        if (!alive) return;
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const [senha, setSenha] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState({ senha: "", confirm: "" });
@@ -51,9 +70,9 @@ export default function ForgotResetScreen({ route, navigation }) {
     }).start();
   }, [screenAnim]);
   const cardTranslateY = screenAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
-  const cardOpacity    = screenAnim;
-  const wmOpacity      = screenAnim;
-  const wmScale        = screenAnim.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] });
+  const cardOpacity = screenAnim;
+  const wmOpacity = screenAnim;
+  const wmScale = screenAnim.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] });
 
   // “Respirar” watermark
   const breathe = useRef(new Animated.Value(0)).current;
@@ -70,9 +89,9 @@ export default function ForgotResetScreen({ route, navigation }) {
   const breatheScale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] });
 
   // Animação de SAÍDA (para Login)
-  const exitAnim   = useRef(new Animated.Value(0)).current;
-  const exitFade   = exitAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const exitSlide  = exitAnim.interpolate({ inputRange: [0, 1], outputRange: [0, width * 0.08] });
+  const exitAnim = useRef(new Animated.Value(0)).current;
+  const exitFade = exitAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const exitSlide = exitAnim.interpolate({ inputRange: [0, 1], outputRange: [0, width * 0.08] });
   const leavingRef = useRef(false);
   const goLoginAnimated = () => {
     if (leavingRef.current) return;
@@ -106,14 +125,12 @@ export default function ForgotResetScreen({ route, navigation }) {
 
     try {
       setLoading(true);
-      await forgotReset(token, senha); // POST { token, nova_senha }
+      await forgotReset(token, senha);
 
-      // Sucesso → mostra alerta e inicia animação de saída
       Alert.alert("Sucesso", "Senha atualizada!", [{ text: "OK", onPress: goLoginAnimated }]);
-      // Fallback em web (caso o Alert não segure o fluxo visualmente)
       if (Platform.OS === "web") setTimeout(goLoginAnimated, 900);
     } catch (err) {
-      const status  = err?.response?.status;
+      const status = err?.response?.status;
       const payload = err?.response?.data || {};
       const msg = payload.erro || payload.message || "Não foi possível trocar a senha.";
 
@@ -150,11 +167,9 @@ export default function ForgotResetScreen({ route, navigation }) {
 
       {/* Watermark */}
       <Animated.View
-        style={[
-          styles.watermarkWrap,
-          { opacity: Animated.multiply(wmOpacity, exitFade) },
-        ]}
+        style={[styles.watermarkWrap, { opacity: Animated.multiply(wmOpacity, exitFade) }]}
         pointerEvents="none"
+        collapsable={false}
       >
         <Animated.View
           style={[
@@ -166,12 +181,15 @@ export default function ForgotResetScreen({ route, navigation }) {
               ],
             },
           ]}
+          collapsable={false}
         >
           <Image
+            key={`wm-${route?.key || "sem-rota"}`}
             source={require("../../assets/Logo-savoia.png")}
             style={styles.watermarkImage}
             resizeMode="contain"
             accessible={false}
+            fadeDuration={0}
           />
           <View style={styles.ringMask} />
         </Animated.View>
@@ -188,10 +206,7 @@ export default function ForgotResetScreen({ route, navigation }) {
           },
         ]}
       >
-        <Pressable
-          onPress={handleBack}
-          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-        >
+        <Pressable onPress={handleBack} style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <Ionicons name="arrow-back" size={26} color="#fff" />
         </Pressable>
       </Animated.View>
@@ -203,9 +218,20 @@ export default function ForgotResetScreen({ route, navigation }) {
           transform: [{ translateY: cardTranslateY }, { translateX: exitSlide }],
         }}
       >
-        <View style={styles.shadowWrap} renderToHardwareTextureAndroid shouldRasterizeIOS>
+        <View
+          style={styles.shadowWrap}
+          renderToHardwareTextureAndroid={Platform.OS === "android"}
+          // Importante: NÃO usar shouldRasterizeIOS aqui (pode quebrar o BlurView no iOS).
+        >
           <View style={styles.cardWrap}>
-            <BlurView intensity={30} tint="light" style={StyleSheet.absoluteFill} />
+            <BlurView
+              intensity={Platform.OS === "ios" ? 18 : 30}
+              tint={Platform.OS === "ios" ? "dark" : "light"}
+              style={[StyleSheet.absoluteFill, styles.blurLayer]}
+              pointerEvents="none"
+            />
+            <View style={styles.blurOverlay} pointerEvents="none" />
+
             <View style={styles.cardContent}>
               <Text style={styles.title}>Defina sua nova senha</Text>
 
@@ -229,12 +255,7 @@ export default function ForgotResetScreen({ route, navigation }) {
                 error={errors.confirm}
               />
 
-              <SvButton
-                title="Salvar"
-                onPress={handleReset}
-                loading={loading}
-                style={{ marginTop: 16 }}
-              />
+              <SvButton title="Salvar" onPress={handleReset} loading={loading} style={{ marginTop: 16 }} />
             </View>
           </View>
         </View>
@@ -244,13 +265,41 @@ export default function ForgotResetScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:{ flex:1, alignItems:"center", justifyContent:"center", backgroundColor: BG },
+  container: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BG },
 
   // watermark
-  watermarkWrap: { position: "absolute", top: LOGO_TOP, alignItems: "center", justifyContent: "center", width: LOGO_SIZE, height: LOGO_SIZE },
-  watermarkClip: { width: "100%", height: "100%", borderRadius: LOGO_SIZE / 2, overflow: "hidden", position: "relative" },
-  watermarkImage: { width: "100%", height: "100%", opacity: 0.08, transform: [{ scale: LOGO_SCALE }], alignSelf: "center", backgroundColor: "transparent" },
-  ringMask: { ...StyleSheet.absoluteFillObject, borderRadius: LOGO_SIZE / 2, borderWidth: EDGE_HIDE, borderColor: "#072F20", backgroundColor: "transparent" },
+  watermarkWrap: {
+    position: "absolute",
+    top: LOGO_TOP,
+    alignItems: "center",
+    justifyContent: "center",
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    zIndex: 0,
+    ...(Platform.OS === "ios" ? { needsOffscreenAlphaCompositing: true } : null),
+  },
+  watermarkClip: {
+    width: "100%",
+    height: "100%",
+    borderRadius: LOGO_SIZE / 2,
+    overflow: "hidden",
+    position: "relative",
+  },
+  watermarkImage: {
+    width: "100%",
+    height: "100%",
+    opacity: 0.08,
+    transform: [{ scale: LOGO_SCALE }],
+    alignSelf: "center",
+    backgroundColor: "transparent",
+  },
+  ringMask: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: LOGO_SIZE / 2,
+    borderWidth: EDGE_HIDE,
+    borderColor: "#072F20",
+    backgroundColor: "transparent",
+  },
 
   backBtn: {
     position: "absolute",
@@ -265,9 +314,31 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
 
-  shadowWrap:{ width: CARD_WIDTH, borderRadius: RADIUS, shadowColor:"#000", shadowOpacity:.25, shadowRadius:18, shadowOffset:{width:0,height:10}, elevation:14 },
-  cardWrap:{ borderRadius:RADIUS, overflow:"hidden", borderWidth:1, borderColor:"rgba(255,255,255,0.25)", backgroundColor:"rgba(255,255,255,0.16)" },
-  cardContent:{ padding:18 },
+  shadowWrap: {
+    width: CARD_WIDTH,
+    borderRadius: RADIUS,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 14,
+  },
+  cardWrap: {
+    borderRadius: RADIUS,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+    backgroundColor: Platform.OS === "ios" ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.16)",
+  },
 
-  title:{ color:"#fff", fontSize:18, fontWeight:"900", marginBottom:10 },
+  blurLayer: { zIndex: 0 },
+  blurOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    backgroundColor: Platform.OS === "ios" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0)",
+  },
+
+  cardContent: { padding: 18, position: "relative", zIndex: 2 },
+
+  title: { color: "#fff", fontSize: 18, fontWeight: "900", marginBottom: 10 },
 });
