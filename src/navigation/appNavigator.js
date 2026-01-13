@@ -37,10 +37,10 @@ const modalLike = Platform.select({
     contentStyle: { backgroundColor: STACK_BG },
   },
   default: {
-    presentation: "transparentModal",
+    presentation: "card",
     animation: "fade",
-    detachPreviousScreen: false,
-    contentStyle: { backgroundColor: "transparent" },
+    detachPreviousScreen: true,
+    contentStyle: { backgroundColor: STACK_BG },
   },
 });
 

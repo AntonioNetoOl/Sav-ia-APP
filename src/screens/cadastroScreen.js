@@ -1,5 +1,6 @@
 // src/screens/CadastroScreen.js
 import { Ionicons } from "@expo/vector-icons";
+//import { Asset } from "expo-asset";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
@@ -12,12 +13,15 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { sendEmailCode } from "../api/client"; // <<< não salvamos aqui!
 import SvButton from "../components/svButton";
 import SvInput from "../components/svInput";
+import useAuthAssets from "../hooks/useAuthAssets";
 import {
   formatCPF,
   formatPhone,
@@ -34,17 +38,45 @@ import {
 const { width, height } = Dimensions.get("window");
 const CARD_WIDTH = Math.min(500, width - 20);
 const RADIUS = 18;
-const GRADIENT_COLORS = ["#083726", "#072F20", "#05271A"];
 
+const GRADIENT_COLORS = ["#083726", "#072F20", "#05271A"];
+const BG = "#05271A";
+
+// Watermark
 const LOGO_SIZE = width * 0.88;
 const LOGO_SCALE = 1.02;
 const EDGE_HIDE = Math.max(6, Math.round(width * 0.012));
 const LOGO_TOP = height * 0.065;
 
 export default function CadastroScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  useAuthAssets();
+
+  /*// Mitigação: pré-carregar asset do watermark (reduz “sumir” intermitente)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const asset = Asset.fromModule(require("../../assets/Logo-savoia.png"));
+        await asset.downloadAsync();
+      } catch {
+        // fallback silencioso
+      } finally {
+        if (!alive) return;
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []); */
+
   const screenAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(screenAnim, { toValue: 1, duration: 420, useNativeDriver: true }).start();
+    Animated.timing(screenAnim, {
+      toValue: 1,
+      duration: 420,
+      useNativeDriver: true,
+    }).start();
   }, [screenAnim]);
 
   // “respirar” da watermark
@@ -52,20 +84,37 @@ export default function CadastroScreen({ navigation }) {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(breathe, { toValue: 1, duration: 3800, useNativeDriver: true }),
-        Animated.timing(breathe, { toValue: 0, duration: 3800, useNativeDriver: true }),
+        Animated.timing(breathe, {
+          toValue: 1,
+          duration: 3800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(breathe, {
+          toValue: 0,
+          duration: 3800,
+          useNativeDriver: true,
+        }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, [breathe]);
-  const breatheScale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] });
+  const breatheScale = breathe.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.02],
+  });
 
-  const cardTranslateY = screenAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
-  const cardOpacity    = screenAnim;
-  const wmOpacity      = screenAnim;
-  const wmScale        = screenAnim.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] });
-  const backOpacity    = screenAnim;
+  const cardTranslateY = screenAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [16, 0],
+  });
+  const cardOpacity = screenAnim;
+  const wmOpacity = screenAnim;
+  const wmScale = screenAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.98, 1],
+  });
+  const backOpacity = screenAnim;
 
   // ===== estado do formulário =====
   const [nome, setNome] = useState("");
@@ -78,13 +127,14 @@ export default function CadastroScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   // handlers
-  const onNameChange  = (v) => setNome(sanitizeNameLive(v));
-  const onCpfChange   = (v) => setCpf(formatCPF(v));
+  const onNameChange = (v) => setNome(sanitizeNameLive(v));
+  const onCpfChange = (v) => setCpf(formatCPF(v));
   const onPhoneChange = (v) => setNumero(formatPhone(v));
 
   const validate = () => {
     const e = {};
-    if (!isValidFullName(nome)) e.nome = "Informe nome e sobrenome (apenas letras).";
+    if (!isValidFullName(nome))
+      e.nome = "Informe nome e sobrenome (apenas letras).";
     if (!isValidCPF(cpf)) e.cpf = "CPF inválido.";
     if (!isValidEmail(email)) e.email = "E-mail inválido.";
     if (!isStrongPassword(senha)) e.senha = "Senha muito curta (mín. 6).";
@@ -111,34 +161,34 @@ export default function CadastroScreen({ navigation }) {
 
     try {
       await sendEmailCode(form);
-      // sucesso: código enviado → navega e já inicia timer em 30s
       navigation.navigate("VerifyEmail", {
         email: form.email,
         alreadySent: true,
         cooldown: 30,
       });
     } catch (e) {
-      const status  = e?.response?.status;
+      const status = e?.response?.status;
       const payload = e?.response?.data || {};
       const msg =
-        payload.erro ||
-        payload.message ||
-        "Falha ao iniciar verificação.";
+        payload.erro || payload.message || "Falha ao iniciar verificação.";
 
       if (status === 409) {
-        // Backend agora pode retornar { campos: { email: boolean, cpf: boolean } }
         const campos = payload.campos || {};
-        setErrors(prev => {
-            const next = { ...prev, cpf: undefined, email: undefined };
-            if (campos?.cpf)   next.cpf   = "Este CPF já está vinculado a um usuário.";
-            if (campos?.email) next.email = "Este E-mail já está vinculado a um usuário.";
-            return next;
-          });
+        setErrors((prev) => {
+          const next = { ...prev, cpf: undefined, email: undefined };
+          if (campos?.cpf)
+            next.cpf = "Este CPF já está vinculado a um usuário.";
+          if (campos?.email)
+            next.email = "Este E-mail já está vinculado a um usuário.";
+          return next;
+        });
         Alert.alert("Atenção", msg);
         return;
       } else if (status === 429) {
-        // Cooldown ativo (código enviado recentemente) → pode ir para verify com timer
-        Alert.alert("Ops!", "Aguarde alguns segundos antes de solicitar novo código.");
+        Alert.alert(
+          "Ops!",
+          "Aguarde alguns segundos antes de solicitar novo código."
+        );
         navigation.navigate("VerifyEmail", {
           email: form.email,
           alreadySent: true,
@@ -146,11 +196,9 @@ export default function CadastroScreen({ navigation }) {
         });
         return;
       } else if (status === 400 || status === 422) {
-        // Dados inválidos pelo back → NÃO navega
         Alert.alert("Atenção", msg);
         return;
       } else {
-        // Erro genérico / rede
         Alert.alert("Ops!", msg);
         return;
       }
@@ -160,33 +208,52 @@ export default function CadastroScreen({ navigation }) {
   };
 
   const handleBack = () => {
-    Animated.timing(screenAnim, { toValue: 0, duration: 260, useNativeDriver: true }).start(() => {
+    Animated.timing(screenAnim, {
+      toValue: 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start(() => {
       navigation.goBack();
     });
   };
 
-  // posicionamento do botão voltar (web costuma precisar de menos top)
-  const backTop = Platform.select({ web: 16, ios: 48, android: 48 });
+  // ===== Safe area / header space =====
+  const BACK_SIZE = 40;
+  const BACK_GAP = 12;
+
+  // top real do botão, respeitando notch
+  const backTop = Platform.OS === "web" ? 16 : (insets.top || 0) + 8;
+
+  // reserva de espaço para o card não “entrar” atrás do botão
+  const headerSpace = backTop + BACK_SIZE + BACK_GAP;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: BG }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <StatusBar barStyle="light-content" backgroundColor={BG} />
+
       <ScrollView
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: BG }}
         contentContainerStyle={{
           flexGrow: 1,
           minHeight: height,
           alignItems: "center",
           justifyContent: "center",
+          backgroundColor: BG,
+          paddingTop: headerSpace,
+          paddingBottom: 24,
         }}
         keyboardShouldPersistTaps="handled"
         overScrollMode="never"
       >
-        <View style={styles.container} pointerEvents="auto">
-          {Platform.OS === "web" && (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(5,39,26,0.98)", zIndex: -2 }]} />
-          )}
-
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: cardOpacity, zIndex: -1 }]} pointerEvents="none">
+        <View style={styles.container} pointerEvents="box-none">
+          {/* Fundo */}
+          <Animated.View
+            style={[StyleSheet.absoluteFill, { opacity: cardOpacity }]}
+            pointerEvents="none"
+          >
             <LinearGradient
               colors={GRADIENT_COLORS}
               start={{ x: 0, y: 0 }}
@@ -195,34 +262,58 @@ export default function CadastroScreen({ navigation }) {
             />
           </Animated.View>
 
-          <Animated.View style={[styles.watermarkWrap, { opacity: wmOpacity }]} pointerEvents="none">
-            <Animated.View style={[styles.watermarkClip, { transform: [{ scale: Animated.multiply(wmScale, breatheScale) }] }]}>
-              <Image source={require("../../assets/Logo-savoia.png")} style={styles.watermarkImage} resizeMode="contain" accessible={false} />
+          {/* Watermark */}
+          <Animated.View
+            style={[styles.watermarkWrap, { opacity: wmOpacity }]}
+            pointerEvents="none"
+            collapsable={false}
+          >
+            <Animated.View
+              style={[
+                styles.watermarkClip,
+                {
+                  transform: [
+                    { scale: Animated.multiply(wmScale, breatheScale) },
+                  ],
+                },
+              ]}
+              pointerEvents="none"
+              collapsable={false}
+            >
+              <Image
+                key="wm-cadastro"
+                source={require("../../assets/Logo-savoia.png")}
+                style={styles.watermarkImage}
+                resizeMode="contain"
+                accessible={false}
+                fadeDuration={0}
+              />
               <View style={styles.ringMask} />
             </Animated.View>
           </Animated.View>
 
-          <Animated.View style={[styles.backBtn, { opacity: backOpacity, top: backTop }]}>
-            <Pressable onPress={handleBack} style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name="arrow-back" size={26} color="#fff" />
-            </Pressable>
-          </Animated.View>
-
-          <Animated.View style={{ opacity: cardOpacity, transform: [{ translateY: cardTranslateY }] }}>
+          {/* Card */}
+          <Animated.View
+            style={{
+              opacity: cardOpacity,
+              transform: [{ translateY: cardTranslateY }],
+            }}
+          >
             <View
               style={styles.shadowWrap}
-              renderToHardwareTextureAndroid
-              shouldRasterizeIOS
+              renderToHardwareTextureAndroid={Platform.OS === "android"}
               pointerEvents="auto"
             >
               <View style={styles.cardWrap}>
                 <BlurView
-                  intensity={30}
-                  tint="light"
-                  style={StyleSheet.absoluteFill}
+                  intensity={Platform.OS === "ios" ? 18 : 30}
+                  tint={Platform.OS === "ios" ? "dark" : "light"}
+                  style={[StyleSheet.absoluteFill, styles.blurLayer]}
                   pointerEvents="none"
                   accessible={false}
                 />
+                <View style={styles.blurOverlay} pointerEvents="none" />
+
                 <View style={styles.cardContent}>
                   <SvInput
                     label="NOME COMPLETO"
@@ -273,8 +364,7 @@ export default function CadastroScreen({ navigation }) {
                     secureToggle
                     error={errors.confirmSenha}
                     style={{ marginTop: 12 }}
-                    onSubmitEditing={handleCadastro}
-                    returnKeyType="done"
+                    returnKeyType="next"
                   />
                   <SvInput
                     label="TELEFONE"
@@ -285,6 +375,8 @@ export default function CadastroScreen({ navigation }) {
                     mask="phone"
                     error={errors.numero}
                     style={{ marginTop: 12, marginBottom: 16 }}
+                    returnKeyType="done"
+                    onSubmitEditing={handleCadastro}
                   />
 
                   <SvButton
@@ -297,6 +389,23 @@ export default function CadastroScreen({ navigation }) {
               </View>
             </View>
           </Animated.View>
+
+          {/* Botão voltar */}
+          <Animated.View
+            style={[styles.backBtn, { opacity: backOpacity, top: backTop }]}
+          >
+            <Pressable
+              onPress={handleBack}
+              hitSlop={10}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name="arrow-back" size={26} color="#fff" />
+            </Pressable>
+          </Animated.View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -306,25 +415,48 @@ export default function CadastroScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-  },
-
-    container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-   // 👇 fixes web: absoluteFill (gradiente/watermark) precisa da largura total
     width: "100%",
-   position: "relative",
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
   },
 
-  watermarkWrap: { position: "absolute", top: LOGO_TOP, alignItems: "center", justifyContent: "center", width: LOGO_SIZE, height: LOGO_SIZE },
-  watermarkClip: { width: "100%", height: "100%", borderRadius: LOGO_SIZE / 2, overflow: "hidden", position: "relative" },
-  watermarkImage: { width: "100%", height: "100%", opacity: 0.08, transform: [{ scale: LOGO_SCALE }], alignSelf: "center", backgroundColor: "transparent" },
-  ringMask: { ...StyleSheet.absoluteFillObject, borderRadius: LOGO_SIZE / 2, borderWidth: EDGE_HIDE, borderColor: "#072F20", backgroundColor: "transparent" },
+  // watermark
+  watermarkWrap: {
+    position: "absolute",
+    top: LOGO_TOP,
+    alignItems: "center",
+    justifyContent: "center",
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    zIndex: 0,
+    ...(Platform.OS === "ios"
+      ? { needsOffscreenAlphaCompositing: true }
+      : null),
+  },
+  watermarkClip: {
+    width: "100%",
+    height: "100%",
+    borderRadius: LOGO_SIZE / 2,
+    overflow: "hidden",
+    position: "relative",
+  },
+  watermarkImage: {
+    width: "100%",
+    height: "100%",
+    opacity: 0.08,
+    transform: [{ scale: LOGO_SCALE }],
+    alignSelf: "center",
+    backgroundColor: "transparent",
+  },
+  ringMask: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: LOGO_SIZE / 2,
+    borderWidth: EDGE_HIDE,
+    borderColor: "#072F20",
+    backgroundColor: "transparent",
+  },
 
   backBtn: {
     position: "absolute",
@@ -336,7 +468,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.25)",
     overflow: "hidden",
-    zIndex: 5,
+    zIndex: 30,
+    elevation: 30,
   },
 
   shadowWrap: {
@@ -353,7 +486,19 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.25)",
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor:
+      Platform.OS === "ios"
+        ? "rgba(255,255,255,0.10)"
+        : "rgba(255,255,255,0.16)",
   },
-  cardContent: { padding: 18 },
+
+  blurLayer: { zIndex: 0 },
+  blurOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    backgroundColor:
+      Platform.OS === "ios" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0)",
+  },
+
+  cardContent: { padding: 18, position: "relative", zIndex: 2 },
 });

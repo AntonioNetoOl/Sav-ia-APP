@@ -4,7 +4,7 @@ import { removeToken } from "../utils/storage";
 export default function HomeScreen({ navigation }) {
   const handleLogout = async () => {
     await removeToken();
-    navigation.replace("Login");
+    navigation.reset({ index: 0, routes: [{ name: "Login" }] });
   };
 
   return (
