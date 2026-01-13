@@ -17,9 +17,11 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { forgotStart } from "../api/client";
 import SvButton from "../components/svButton";
 import SvInput from "../components/svInput";
+import useAuthAssets from "../hooks/useAuthAssets";
 
 const { width, height } = Dimensions.get("window");
 const CARD_WIDTH = Math.min(420, width - 32);
@@ -35,31 +37,55 @@ const EDGE_HIDE = Math.max(6, Math.round(width * 0.012));
 const LOGO_TOP = height * 0.065;
 
 export default function ForgotEmailScreen({ navigation, route }) {
+  useAuthAssets();
+  const insets = useSafeAreaInsets();
+  const backTop = Platform.OS === "web" ? 16 : (insets.top || 0) + 8;
   const prefillEmail = route?.params?.email || "";
 
   // animações
   const enter = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(enter, { toValue: 1, duration: 420, useNativeDriver: true }).start();
+    Animated.timing(enter, {
+      toValue: 1,
+      duration: 420,
+      useNativeDriver: true,
+    }).start();
   }, [enter]);
 
-  const cardTY   = enter.interpolate({ inputRange: [0, 1], outputRange: [14, 0] });
-  const cardOp   = enter;
-  const wmScaleE = enter.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] });
+  const cardTY = enter.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, 0],
+  });
+  const cardOp = enter;
+  const wmScaleE = enter.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.98, 1],
+  });
 
   // “respirar” logo
   const breathe = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(breathe, { toValue: 1, duration: 3800, useNativeDriver: true }),
-        Animated.timing(breathe, { toValue: 0, duration: 3800, useNativeDriver: true }),
+        Animated.timing(breathe, {
+          toValue: 1,
+          duration: 3800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(breathe, {
+          toValue: 0,
+          duration: 3800,
+          useNativeDriver: true,
+        }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, [breathe]);
-  const breatheScale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] });
+  const breatheScale = breathe.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.02],
+  });
 
   // animação de voltar
   const exit = useRef(new Animated.Value(0)).current;
@@ -67,12 +93,23 @@ export default function ForgotEmailScreen({ navigation, route }) {
   const handleBack = () => {
     if (exiting) return;
     setExiting(true);
-    Animated.timing(exit, { toValue: 1, duration: 220, useNativeDriver: true }).start(() => {
-      navigation.replace("Login");
+    Animated.timing(exit, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => {
+      if (navigation.canGoBack()) navigation.goBack();
+      else navigation.reset({ index: 0, routes: [{ name: "Login" }] });
     });
   };
-  const exitFade  = exit.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const exitSlide = exit.interpolate({ inputRange: [0, 1], outputRange: [0, width * 0.08] });
+  const exitFade = exit.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+  const exitSlide = exit.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, width * 0.08],
+  });
 
   // estado
   const [email, setEmail] = useState(prefillEmail);
@@ -98,9 +135,12 @@ export default function ForgotEmailScreen({ navigation, route }) {
       Alert.alert("Verifique seu e-mail", "Enviamos um código de 6 dígitos.");
       navigation.replace("ForgotCode", { email: normalized });
     } catch (e) {
-      const status  = e?.response?.status;
+      const status = e?.response?.status;
       const payload = e?.response?.data || {};
-      const msg = payload.erro || payload.message || "Não foi possível iniciar a recuperação.";
+      const msg =
+        payload.erro ||
+        payload.message ||
+        "Não foi possível iniciar a recuperação.";
 
       if (status === 404) {
         setError("Usuário não encontrado para este e-mail.");
@@ -117,7 +157,10 @@ export default function ForgotEmailScreen({ navigation, route }) {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       <StatusBar barStyle="light-content" backgroundColor={BG} />
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, backgroundColor: BG }}
@@ -125,31 +168,94 @@ export default function ForgotEmailScreen({ navigation, route }) {
         overScrollMode="never"
       >
         <View style={styles.container}>
-          <LinearGradient colors={GRADIENT_COLORS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient
+            colors={GRADIENT_COLORS}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
 
           {/* Watermark */}
-          <Animated.View style={[styles.watermarkWrap, { opacity: Animated.multiply(cardOp, exitFade) }]} pointerEvents="none">
-            <Animated.View style={[styles.watermarkClip, { transform: [{ scale: Animated.multiply(wmScaleE, breatheScale) }] }]}>
-              <Image source={require("../../assets/Logo-savoia.png")} style={styles.watermarkImage} resizeMode="contain" accessible={false} />
+          <Animated.View
+            style={[
+              styles.watermarkWrap,
+              { opacity: Animated.multiply(cardOp, exitFade) },
+            ]}
+            pointerEvents="none"
+          >
+            <Animated.View
+              style={[
+                styles.watermarkClip,
+                {
+                  transform: [
+                    { scale: Animated.multiply(wmScaleE, breatheScale) },
+                  ],
+                },
+              ]}
+            >
+              <Image
+                source={require("../../assets/Logo-savoia.png")}
+                style={styles.watermarkImage}
+                resizeMode="contain"
+                accessible={false}
+              />
               <View style={styles.ringMask} />
             </Animated.View>
           </Animated.View>
 
           {/* voltar */}
-          <Animated.View style={[styles.backBtn, { opacity: Animated.multiply(cardOp, exitFade), transform: [{ translateX: exitSlide }] }]}>
-            <Pressable onPress={handleBack} hitSlop={10} style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <Animated.View
+            style={[
+              styles.backBtn,
+              {
+                top: backTop,
+                opacity: Animated.multiply(cardOp, exitFade),
+                transform: [{ translateX: exitSlide }],
+              },
+            ]}
+          >
+            <Pressable
+              onPress={handleBack}
+              hitSlop={10}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+            >
               <Ionicons name="arrow-back" size={26} color="#fff" />
             </Pressable>
           </Animated.View>
 
           {/* card */}
-          <Animated.View style={{ opacity: Animated.multiply(cardOp, exitFade), transform: [{ translateY: cardTY }, { translateX: exitSlide }] }}>
-            <View style={styles.shadowWrap} renderToHardwareTextureAndroid shouldRasterizeIOS>
+          <Animated.View
+            style={{
+              opacity: Animated.multiply(cardOp, exitFade),
+              transform: [{ translateY: cardTY }, { translateX: exitSlide }],
+            }}
+          >
+            <View
+              style={styles.shadowWrap}
+              renderToHardwareTextureAndroid={Platform.OS === "android"}
+              // NÃO usar shouldRasterizeIOS aqui: quebra composição do BlurView no iOS em alguns casos.
+            >
               <View style={styles.cardWrap}>
-                <BlurView intensity={30} tint="light" style={StyleSheet.absoluteFill} />
+                <BlurView
+                  intensity={Platform.OS === "ios" ? 18 : 30}
+                  tint={Platform.OS === "ios" ? "dark" : "light"}
+                  style={[StyleSheet.absoluteFill, styles.blurLayer]}
+                  pointerEvents="none"
+                />
+                <View style={styles.blurOverlay} pointerEvents="none" />
+
                 <View style={styles.cardContent}>
                   <Text style={styles.title}>Esqueci minha senha</Text>
-                  <Text style={styles.subtitle}>Digite o e-mail cadastrado para enviarmos um código de verificação.</Text>
+                  <Text style={styles.subtitle}>
+                    Digite o e-mail cadastrado para enviarmos um código de
+                    verificação.
+                  </Text>
 
                   <SvInput
                     label="E-MAIL"
@@ -165,7 +271,12 @@ export default function ForgotEmailScreen({ navigation, route }) {
                     error={error}
                   />
 
-                  <SvButton title="Enviar código" onPress={handleSend} loading={loading} style={{ marginTop: 16 }} />
+                  <SvButton
+                    title="Enviar código"
+                    onPress={handleSend}
+                    loading={loading}
+                    style={{ marginTop: 16 }}
+                  />
                 </View>
               </View>
             </View>
@@ -177,19 +288,94 @@ export default function ForgotEmailScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BG },
-  backBtn: { position: "absolute", top: 48, left: 20, width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.12)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: BG,
+  },
+  backBtn: {
+    position: "absolute",
+    top: 48,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
 
   // Watermark / logo
-  watermarkWrap: { position: "absolute", top: LOGO_TOP, alignItems: "center", justifyContent: "center", width: LOGO_SIZE, height: LOGO_SIZE },
-  watermarkClip: { width: "100%", height: "100%", borderRadius: LOGO_SIZE / 2, overflow: "hidden", position: "relative" },
-  watermarkImage: { width: "100%", height: "100%", opacity: 0.08, transform: [{ scale: LOGO_SCALE }], alignSelf: "center", backgroundColor: "transparent" },
-  ringMask: { ...StyleSheet.absoluteFillObject, borderRadius: LOGO_SIZE / 2, borderWidth: EDGE_HIDE, borderColor: "#072F20", backgroundColor: "transparent" },
+  watermarkWrap: {
+    position: "absolute",
+    top: LOGO_TOP,
+    alignItems: "center",
+    justifyContent: "center",
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+  },
+  watermarkClip: {
+    width: "100%",
+    height: "100%",
+    borderRadius: LOGO_SIZE / 2,
+    overflow: "hidden",
+    position: "relative",
+  },
+  watermarkImage: {
+    width: "100%",
+    height: "100%",
+    opacity: 0.08,
+    transform: [{ scale: LOGO_SCALE }],
+    alignSelf: "center",
+    backgroundColor: "transparent",
+  },
+  ringMask: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: LOGO_SIZE / 2,
+    borderWidth: EDGE_HIDE,
+    borderColor: "#072F20",
+    backgroundColor: "transparent",
+  },
 
-  shadowWrap: { width: CARD_WIDTH, borderRadius: 18, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 14 },
-  cardWrap: { borderRadius: RADIUS, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", backgroundColor: "rgba(255,255,255,0.16)" },
-  cardContent: { padding: 18 },
+  shadowWrap: {
+    width: CARD_WIDTH,
+    borderRadius: 18,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 14,
+  },
+  cardWrap: {
+    borderRadius: RADIUS,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+    backgroundColor:
+      Platform.OS === "ios"
+        ? "rgba(255,255,255,0.10)"
+        : "rgba(255,255,255,0.16)",
+  },
+
+  blurLayer: { zIndex: 0 },
+  blurOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    backgroundColor:
+      Platform.OS === "ios" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0)",
+  },
+
+  cardContent: { padding: 18, position: "relative", zIndex: 2 },
 
   title: { color: "#fff", fontSize: 18, fontWeight: "900" },
-  subtitle: { color: "rgba(255,255,255,0.85)", marginTop: 6, marginBottom: 12, lineHeight: 20, textAlign: "center" },
+  subtitle: {
+    color: "rgba(255,255,255,0.85)",
+    marginTop: 6,
+    marginBottom: 12,
+    lineHeight: 20,
+    textAlign: "center",
+  },
 });

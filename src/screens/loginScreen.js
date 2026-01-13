@@ -18,7 +18,13 @@ import { loginRequest } from "../api/client";
 import SvButton from "../components/svButton";
 import SvInput from "../components/svInput";
 import { TOKEN_FIELD } from "../constants/config";
-import { formatCPF, isValidCPF, isValidEmail, onlyDigits } from "../utils/masks";
+import useAuthAssets from "../hooks/useAuthAssets";
+import {
+  formatCPF,
+  isValidCPF,
+  isValidEmail,
+  onlyDigits,
+} from "../utils/masks";
 import { saveToken } from "../utils/storage";
 
 const { width, height } = Dimensions.get("window");
@@ -34,23 +40,40 @@ const EDGE_HIDE = Math.max(6, Math.round(width * 0.012));
 const LOGO_TOP = height * 0.065;
 
 export default function LoginScreen({ navigation }) {
+  useAuthAssets();
+
   // animações
   const cardAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(cardAnim, { toValue: 1, duration: 420, useNativeDriver: true }).start();
+    Animated.timing(cardAnim, {
+      toValue: 1,
+      duration: 420,
+      useNativeDriver: true,
+    }).start();
   }, []);
   const breathe = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(breathe, { toValue: 1, duration: 3800, useNativeDriver: true }),
-        Animated.timing(breathe, { toValue: 0, duration: 3800, useNativeDriver: true }),
+        Animated.timing(breathe, {
+          toValue: 1,
+          duration: 3800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(breathe, {
+          toValue: 0,
+          duration: 3800,
+          useNativeDriver: true,
+        }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, []);
-  const breatheScale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] });
+  const breatheScale = breathe.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.02],
+  });
 
   // ======= estado do formulário =======
   const [mode, setMode] = useState("cpf"); // "cpf" | "email"
@@ -76,6 +99,7 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleLogin = async () => {
+    if (loading) return;
     if (!validate()) return;
     try {
       setLoading(true);
@@ -90,7 +114,9 @@ export default function LoginScreen({ navigation }) {
       const msg =
         err?.response?.data?.erro ||
         err?.response?.data?.message ||
-        `Request failed with status code ${err?.response?.status || ""}`.trim() ||
+        `Request failed with status code ${
+          err?.response?.status || ""
+        }`.trim() ||
         "Erro ao entrar.";
       setErrors((prev) => ({ ...prev, senha: msg }));
       console.log("LOGIN_ERROR:", err?.response?.data || err?.message);
@@ -121,7 +147,10 @@ export default function LoginScreen({ navigation }) {
           {/* LOGO */}
           <View style={styles.watermarkWrap} pointerEvents="none">
             <Animated.View
-              style={[styles.watermarkClip, { transform: [{ scale: breatheScale }] }]}
+              style={[
+                styles.watermarkClip,
+                { transform: [{ scale: breatheScale }] },
+              ]}
             >
               <Image
                 source={require("../../assets/Logo-savoia.png")}
@@ -163,7 +192,12 @@ export default function LoginScreen({ navigation }) {
                         pressed && styles.modeChipPressed,
                       ]}
                     >
-                      <Text style={[styles.modeText, mode === "cpf" && styles.modeTextActive]}>
+                      <Text
+                        style={[
+                          styles.modeText,
+                          mode === "cpf" && styles.modeTextActive,
+                        ]}
+                      >
                         CPF
                       </Text>
                     </Pressable>
@@ -177,7 +211,12 @@ export default function LoginScreen({ navigation }) {
                         pressed && styles.modeChipPressed,
                       ]}
                     >
-                      <Text style={[styles.modeText, mode === "email" && styles.modeTextActive]}>
+                      <Text
+                        style={[
+                          styles.modeText,
+                          mode === "email" && styles.modeTextActive,
+                        ]}
+                      >
                         E-mail
                       </Text>
                     </Pressable>
@@ -194,7 +233,7 @@ export default function LoginScreen({ navigation }) {
                       autoCorrect={false}
                       autoComplete="off"
                       importantForAutofill="no"
-                      textContentType="oneTimeCode"
+                      textContentType="username"
                       error={errors.user}
                     />
                   ) : (
@@ -230,7 +269,12 @@ export default function LoginScreen({ navigation }) {
 
                   {/* botão */}
                   <View style={styles.buttonWrap}>
-                    <SvButton title="Entrar" onPress={handleLogin} loading={loading} />
+                    <SvButton
+                      title="Entrar"
+                      onPress={handleLogin}
+                      loading={loading}
+                      disabled={loading}
+                    />
                   </View>
 
                   <View style={styles.linksRow}>
@@ -370,5 +414,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  link: { color: "#FFFFFF", fontWeight: "900", textDecorationLine: "underline" },
+  link: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    textDecorationLine: "underline",
+  },
 });
