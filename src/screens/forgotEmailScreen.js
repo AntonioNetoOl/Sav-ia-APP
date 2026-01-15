@@ -1,6 +1,5 @@
-// src/screens/forgotEmailScreen.js
+// src/screens/ForgotEmailScreen.js
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -19,6 +18,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { forgotStart } from "../api/client";
+import GlassCard from "../components/glassCard";
 import SvButton from "../components/svButton";
 import SvInput from "../components/svInput";
 import useAuthAssets from "../hooks/useAuthAssets";
@@ -130,7 +130,6 @@ export default function ForgotEmailScreen({ navigation, route }) {
 
     try {
       setLoading(true);
-      // Backend: POST /api/usuarios/auth/forgot/start  { email }
       await forgotStart(normalized);
       Alert.alert("Verifique seu e-mail", "Enviamos um código de 6 dígitos.");
       navigation.replace("ForgotCode", { email: normalized });
@@ -236,50 +235,41 @@ export default function ForgotEmailScreen({ navigation, route }) {
               transform: [{ translateY: cardTY }, { translateX: exitSlide }],
             }}
           >
-            <View
-              style={styles.shadowWrap}
-              renderToHardwareTextureAndroid={Platform.OS === "android"}
-              // NÃO usar shouldRasterizeIOS aqui: quebra composição do BlurView no iOS em alguns casos.
+            <GlassCard
+              width={CARD_WIDTH}
+              radius={RADIUS}
+              padding={18}
+              blur={Platform.OS === "ios"}
+              androidBlurMode="fallback"
+              androidElevation={0}
             >
-              <View style={styles.cardWrap}>
-                <BlurView
-                  intensity={Platform.OS === "ios" ? 18 : 30}
-                  tint={Platform.OS === "ios" ? "dark" : "light"}
-                  style={[StyleSheet.absoluteFill, styles.blurLayer]}
-                  pointerEvents="none"
-                />
-                <View style={styles.blurOverlay} pointerEvents="none" />
+              <Text style={styles.title}>Esqueci minha senha</Text>
+              <Text style={styles.subtitle}>
+                Digite o e-mail cadastrado para enviarmos um código de
+                verificação.
+              </Text>
 
-                <View style={styles.cardContent}>
-                  <Text style={styles.title}>Esqueci minha senha</Text>
-                  <Text style={styles.subtitle}>
-                    Digite o e-mail cadastrado para enviarmos um código de
-                    verificação.
-                  </Text>
+              <SvInput
+                label="E-MAIL"
+                placeholder="seuemail@exemplo.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                importantForAutofill="no"
+                textContentType="emailAddress"
+                error={error}
+              />
 
-                  <SvInput
-                    label="E-MAIL"
-                    placeholder="seuemail@exemplo.com"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="off"
-                    importantForAutofill="no"
-                    textContentType="emailAddress"
-                    error={error}
-                  />
-
-                  <SvButton
-                    title="Enviar código"
-                    onPress={handleSend}
-                    loading={loading}
-                    style={{ marginTop: 16 }}
-                  />
-                </View>
-              </View>
-            </View>
+              <SvButton
+                title="Enviar código"
+                onPress={handleSend}
+                loading={loading}
+                style={{ marginTop: 16 }}
+              />
+            </GlassCard>
           </Animated.View>
         </View>
       </ScrollView>
@@ -339,36 +329,6 @@ const styles = StyleSheet.create({
     borderColor: "#072F20",
     backgroundColor: "transparent",
   },
-
-  shadowWrap: {
-    width: CARD_WIDTH,
-    borderRadius: 18,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 14,
-  },
-  cardWrap: {
-    borderRadius: RADIUS,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    backgroundColor:
-      Platform.OS === "ios"
-        ? "rgba(255,255,255,0.10)"
-        : "rgba(255,255,255,0.16)",
-  },
-
-  blurLayer: { zIndex: 0 },
-  blurOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-    backgroundColor:
-      Platform.OS === "ios" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0)",
-  },
-
-  cardContent: { padding: 18, position: "relative", zIndex: 2 },
 
   title: { color: "#fff", fontSize: 18, fontWeight: "900" },
   subtitle: {

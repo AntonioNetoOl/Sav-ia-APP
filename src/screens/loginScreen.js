@@ -1,4 +1,4 @@
-// src/screens/loginScreen.js
+// src/screens/LoginScreen.js
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { loginRequest } from "../api/client";
+import GlassCard from "../components/glassCard";
 import SvButton from "../components/svButton";
 import SvInput from "../components/svInput";
 import { TOKEN_FIELD } from "../constants/config";
@@ -176,126 +177,126 @@ export default function LoginScreen({ navigation }) {
               ],
             }}
           >
-            {/* SOMBRA/ELEVATION FORA do card (evita retângulo) */}
-            <View style={styles.shadowWrap}>
-              {/* CARD com fundo único, sem camadas extras */}
-              <View style={styles.cardWrap}>
-                <View style={styles.cardContent}>
-                  {/* Seletor CPF/E-mail */}
-                  <View style={styles.modeRow}>
-                    <Pressable
-                      onPress={() => setMode("cpf")}
-                      android_ripple={{ color: "transparent" }}
-                      style={({ pressed }) => [
-                        styles.modeChip,
-                        mode === "cpf" && styles.modeChipActive,
-                        pressed && styles.modeChipPressed,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.modeText,
-                          mode === "cpf" && styles.modeTextActive,
-                        ]}
-                      >
-                        CPF
-                      </Text>
-                    </Pressable>
+            <GlassCard
+              width={CARD_WIDTH}
+              radius={RADIUS}
+              padding={18}
+              blur={Platform.OS === "ios"}
+              androidBlurMode="fallback"
+              androidElevation={0}
+            >
+              {/* Seletor CPF/E-mail */}
+              <View style={styles.modeRow}>
+                <Pressable
+                  onPress={() => setMode("cpf")}
+                  android_ripple={{ color: "transparent" }}
+                  style={({ pressed }) => [
+                    styles.modeChip,
+                    mode === "cpf" && styles.modeChipActive,
+                    pressed && styles.modeChipPressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.modeText,
+                      mode === "cpf" && styles.modeTextActive,
+                    ]}
+                  >
+                    CPF
+                  </Text>
+                </Pressable>
 
-                    <Pressable
-                      onPress={() => setMode("email")}
-                      android_ripple={{ color: "transparent" }}
-                      style={({ pressed }) => [
-                        styles.modeChip,
-                        mode === "email" && styles.modeChipActive,
-                        pressed && styles.modeChipPressed,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.modeText,
-                          mode === "email" && styles.modeTextActive,
-                        ]}
-                      >
-                        E-mail
-                      </Text>
-                    </Pressable>
-                  </View>
-
-                  {mode === "cpf" ? (
-                    <SvInput
-                      label="CPF"
-                      placeholder="000.000.000-00"
-                      value={formatCPF(cpfRaw)}
-                      onChangeText={onChangeCPF}
-                      keyboardType="number-pad"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      autoComplete="off"
-                      importantForAutofill="no"
-                      textContentType="username"
-                      error={errors.user}
-                    />
-                  ) : (
-                    <SvInput
-                      label="E-MAIL"
-                      placeholder="seuemail@exemplo.com"
-                      value={email}
-                      onChangeText={onChangeEmail}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      autoComplete="off"
-                      importantForAutofill="no"
-                      textContentType="emailAddress"
-                      error={errors.user}
-                    />
-                  )}
-
-                  <SvInput
-                    label="SENHA"
-                    placeholder="Digite sua senha"
-                    value={senha}
-                    onChangeText={setSenha}
-                    secureTextEntry
-                    secureToggle
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="off"
-                    textContentType="password"
-                    error={errors.senha}
-                    style={{ marginTop: 14 }}
-                  />
-
-                  {/* botão */}
-                  <View style={styles.buttonWrap}>
-                    <SvButton
-                      title="Entrar"
-                      onPress={handleLogin}
-                      loading={loading}
-                      disabled={loading}
-                    />
-                  </View>
-
-                  <View style={styles.linksRow}>
-                    <Pressable
-                      onPress={() => navigation.navigate("ForgotEmail")}
-                      hitSlop={10}
-                      android_ripple={{ color: "transparent" }}
-                    >
-                      <Text style={styles.link}>Esqueci minha senha</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => navigation.navigate("Cadastro")}
-                      hitSlop={10}
-                      android_ripple={{ color: "transparent" }}
-                    >
-                      <Text style={styles.link}>Cadastre-se</Text>
-                    </Pressable>
-                  </View>
-                </View>
+                <Pressable
+                  onPress={() => setMode("email")}
+                  android_ripple={{ color: "transparent" }}
+                  style={({ pressed }) => [
+                    styles.modeChip,
+                    mode === "email" && styles.modeChipActive,
+                    pressed && styles.modeChipPressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.modeText,
+                      mode === "email" && styles.modeTextActive,
+                    ]}
+                  >
+                    E-mail
+                  </Text>
+                </Pressable>
               </View>
-            </View>
+
+              {mode === "cpf" ? (
+                <SvInput
+                  label="CPF"
+                  placeholder="000.000.000-00"
+                  value={formatCPF(cpfRaw)}
+                  onChangeText={onChangeCPF}
+                  keyboardType="number-pad"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  importantForAutofill="no"
+                  textContentType="username"
+                  error={errors.user}
+                />
+              ) : (
+                <SvInput
+                  label="E-MAIL"
+                  placeholder="seuemail@exemplo.com"
+                  value={email}
+                  onChangeText={onChangeEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  importantForAutofill="no"
+                  textContentType="emailAddress"
+                  error={errors.user}
+                />
+              )}
+
+              <SvInput
+                label="SENHA"
+                placeholder="Digite sua senha"
+                value={senha}
+                onChangeText={setSenha}
+                secureTextEntry
+                secureToggle
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                textContentType="password"
+                error={errors.senha}
+                style={{ marginTop: 14 }}
+              />
+
+              <View style={styles.buttonWrap}>
+                <SvButton
+                  title="Entrar"
+                  onPress={handleLogin}
+                  loading={loading}
+                  disabled={loading}
+                />
+              </View>
+
+              <View style={styles.linksRow}>
+                <Pressable
+                  onPress={() => navigation.navigate("ForgotEmail")}
+                  hitSlop={10}
+                  android_ripple={{ color: "transparent" }}
+                >
+                  <Text style={styles.link}>Esqueci minha senha</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => navigation.navigate("Cadastro")}
+                  hitSlop={10}
+                  android_ripple={{ color: "transparent" }}
+                >
+                  <Text style={styles.link}>Cadastre-se</Text>
+                </Pressable>
+              </View>
+            </GlassCard>
           </Animated.View>
         </View>
       </ScrollView>
@@ -341,46 +342,6 @@ const styles = StyleSheet.create({
     borderColor: "#072F20",
     backgroundColor: "transparent",
   },
-
-  // sombra no wrapper (não no card)
-  shadowWrap: {
-    width: CARD_WIDTH,
-    borderRadius: RADIUS,
-    backgroundColor: "transparent",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOpacity: 0.25,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 10 },
-      },
-      android: {
-        elevation: 16,
-      },
-      web: {},
-    }),
-  },
-
-  // card com 1 fundo estável (sem camadas extras)
-  cardWrap: {
-    borderRadius: RADIUS,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    // uniforme e estável em qualquer estado
-    backgroundColor: "rgba(255,255,255,0.14)",
-    ...Platform.select({
-      web: {
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-      },
-      android: {
-        // nada de elevation aqui!
-      },
-    }),
-  },
-
-  cardContent: { padding: 18 },
 
   modeRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
   modeChip: {
