@@ -1,7 +1,6 @@
-// src/screens/forgotCodeScreen.js
+// src/screens/ForgotCodeScreen.js
 import { Ionicons } from "@expo/vector-icons";
 //import { Asset } from "expo-asset";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -20,6 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { forgotStart, forgotVerify } from "../api/client";
+import GlassCard from "../components/glassCard";
 import SvButton from "../components/svButton";
 import SvInput from "../components/svInput";
 import useAuthAssets from "../hooks/useAuthAssets";
@@ -44,24 +44,6 @@ export default function ForgotCodeScreen({ route, navigation }) {
   const email = String(route?.params?.email || "")
     .trim()
     .toLowerCase();
-
-  /*// Mitigação: pré-carregar asset do watermark para reduzir falhas intermitentes de render
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const asset = Asset.fromModule(require("../../assets/Logo-savoia.png"));
-        await asset.downloadAsync();
-      } catch {
-        // fallback silencioso
-      } finally {
-        if (!alive) return;
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []); */
 
   // === animações de entrada (card / watermark) ===
   const screenAnim = useRef(new Animated.Value(0)).current;
@@ -117,7 +99,6 @@ export default function ForgotCodeScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const { left, reset } = useCountdown(60);
 
-  // inicia o contador quando abrir
   useEffect(() => {
     reset(60);
   }, [reset]);
@@ -250,61 +231,52 @@ export default function ForgotCodeScreen({ route, navigation }) {
               transform: [{ translateY: cardTranslateY }],
             }}
           >
-            <View
-              style={styles.shadowWrap}
-              renderToHardwareTextureAndroid={Platform.OS === "android"}
-              // Importante: NÃO usar shouldRasterizeIOS aqui (pode quebrar o BlurView no iOS).
+            <GlassCard
+              width={CARD_WIDTH}
+              radius={RADIUS}
+              padding={18}
+              blur={Platform.OS === "ios"}
+              androidBlurMode="fallback"
+              androidElevation={0}
             >
-              <View style={styles.cardWrap}>
-                <BlurView
-                  intensity={Platform.OS === "ios" ? 18 : 30}
-                  tint={Platform.OS === "ios" ? "dark" : "light"}
-                  style={[StyleSheet.absoluteFill, styles.blurLayer]}
-                  pointerEvents="none"
-                />
-                <View style={styles.blurOverlay} pointerEvents="none" />
+              <Text style={styles.title}>Digite o código enviado</Text>
+              <Text style={styles.sub}>{email}</Text>
 
-                <View style={styles.cardContent}>
-                  <Text style={styles.title}>Digite o código enviado</Text>
-                  <Text style={styles.sub}>{email}</Text>
+              <SvInput
+                label="CÓDIGO"
+                placeholder="000000"
+                value={code}
+                onChangeText={(t) => {
+                  setError("");
+                  setCode(t.replace(/\D/g, "").slice(0, 6));
+                }}
+                keyboardType="number-pad"
+                error={error}
+              />
 
-                  <SvInput
-                    label="CÓDIGO"
-                    placeholder="000000"
-                    value={code}
-                    onChangeText={(t) => {
-                      setError("");
-                      setCode(t.replace(/\D/g, "").slice(0, 6));
+              <SvButton
+                title="Validar"
+                onPress={handleVerify}
+                loading={loading}
+                style={{ marginTop: 16 }}
+              />
+
+              <View style={{ marginTop: 12, alignItems: "center" }}>
+                <Pressable
+                  disabled={left > 0 || loading}
+                  onPress={handleResend}
+                >
+                  <Text
+                    style={{
+                      color: left > 0 ? "rgba(255,255,255,0.6)" : "#fff",
+                      fontWeight: "900",
                     }}
-                    keyboardType="number-pad"
-                    error={error}
-                  />
-
-                  <SvButton
-                    title="Validar"
-                    onPress={handleVerify}
-                    loading={loading}
-                    style={{ marginTop: 16 }}
-                  />
-
-                  <View style={{ marginTop: 12, alignItems: "center" }}>
-                    <Pressable
-                      disabled={left > 0 || loading}
-                      onPress={handleResend}
-                    >
-                      <Text
-                        style={{
-                          color: left > 0 ? "rgba(255,255,255,0.6)" : "#fff",
-                          fontWeight: "900",
-                        }}
-                      >
-                        {left > 0 ? `Reenviar (${left}s)` : "Reenviar"}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
+                  >
+                    {left > 0 ? `Reenviar (${left}s)` : "Reenviar"}
+                  </Text>
+                </Pressable>
               </View>
-            </View>
+            </GlassCard>
           </Animated.View>
         </View>
       </ScrollView>
@@ -368,36 +340,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     zIndex: 5,
   },
-
-  shadowWrap: {
-    width: CARD_WIDTH,
-    borderRadius: RADIUS,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 14,
-  },
-  cardWrap: {
-    borderRadius: RADIUS,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    backgroundColor:
-      Platform.OS === "ios"
-        ? "rgba(255,255,255,0.10)"
-        : "rgba(255,255,255,0.16)",
-  },
-
-  blurLayer: { zIndex: 0 },
-  blurOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-    backgroundColor:
-      Platform.OS === "ios" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0)",
-  },
-
-  cardContent: { padding: 18, position: "relative", zIndex: 2 },
 
   title: { color: "#fff", fontSize: 18, fontWeight: "900" },
   sub: { color: "rgba(255,255,255,0.9)", marginTop: 6, marginBottom: 12 },

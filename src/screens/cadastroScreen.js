@@ -1,7 +1,5 @@
 // src/screens/CadastroScreen.js
 import { Ionicons } from "@expo/vector-icons";
-//import { Asset } from "expo-asset";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -18,7 +16,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { sendEmailCode } from "../api/client"; // <<< não salvamos aqui!
+import { sendEmailCode } from "../api/client";
+import GlassCard from "../components/glassCard";
 import SvButton from "../components/svButton";
 import SvInput from "../components/svInput";
 import useAuthAssets from "../hooks/useAuthAssets";
@@ -48,27 +47,22 @@ const LOGO_SCALE = 1.02;
 const EDGE_HIDE = Math.max(6, Math.round(width * 0.012));
 const LOGO_TOP = height * 0.065;
 
+/*const isAndroid = Platform.OS === "android";
+const androidApi = isAndroid ? Number(Platform.Version) : 0;
+const androidHasNativeBlur = isAndroid && androidApi >= 31;
+
+const enableBlur =
+  Platform.OS === "ios" || Platform.OS === "web" || androidHasNativeBlur;
+*/
+
+// Estratégia estável: blur real só no iOS (evita artefatos no Android e o “escurecer após clique” no Web).
+// Se quiser testar blur no Web após o patch do tint, você pode trocar para:
+// const preferBlur = Platform.OS === "ios" || Platform.OS === "web";
+const preferBlur = Platform.OS === "ios";
+
 export default function CadastroScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   useAuthAssets();
-
-  /*// Mitigação: pré-carregar asset do watermark (reduz “sumir” intermitente)
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const asset = Asset.fromModule(require("../../assets/Logo-savoia.png"));
-        await asset.downloadAsync();
-      } catch {
-        // fallback silencioso
-      } finally {
-        if (!alive) return;
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []); */
 
   const screenAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -99,6 +93,7 @@ export default function CadastroScreen({ navigation }) {
     loop.start();
     return () => loop.stop();
   }, [breathe]);
+
   const breatheScale = breathe.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 1.02],
@@ -108,12 +103,15 @@ export default function CadastroScreen({ navigation }) {
     inputRange: [0, 1],
     outputRange: [16, 0],
   });
+
   const cardOpacity = screenAnim;
   const wmOpacity = screenAnim;
+
   const wmScale = screenAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0.98, 1],
   });
+
   const backOpacity = screenAnim;
 
   // ===== estado do formulário =====
@@ -144,7 +142,7 @@ export default function CadastroScreen({ navigation }) {
     return Object.keys(e).length === 0;
   };
 
-  // >>> NÃO salva nada aqui! Só manda o código (quando possível) e navega.
+  // >>> NÃO salva nada aqui! Só manda o código e navega.
   const handleCadastro = async () => {
     if (loading) return;
     if (!validate()) return;
@@ -299,95 +297,84 @@ export default function CadastroScreen({ navigation }) {
               transform: [{ translateY: cardTranslateY }],
             }}
           >
-            <View
-              style={styles.shadowWrap}
-              renderToHardwareTextureAndroid={Platform.OS === "android"}
-              pointerEvents="auto"
+            <GlassCard
+              width={CARD_WIDTH}
+              radius={RADIUS}
+              blur={Platform.OS === "ios"}
+              androidBlurMode="fallback"
+              androidElevation={0}
             >
-              <View style={styles.cardWrap}>
-                <BlurView
-                  intensity={Platform.OS === "ios" ? 18 : 30}
-                  tint={Platform.OS === "ios" ? "dark" : "light"}
-                  style={[StyleSheet.absoluteFill, styles.blurLayer]}
-                  pointerEvents="none"
-                  accessible={false}
-                />
-                <View style={styles.blurOverlay} pointerEvents="none" />
+              <SvInput
+                label="NOME COMPLETO"
+                placeholder="Digite seu nome completo"
+                value={nome}
+                onChangeText={onNameChange}
+                autoCapitalize="words"
+                inputMode="text"
+                maxLength={80}
+                error={errors.nome}
+              />
+              <SvInput
+                label="CPF"
+                placeholder="000.000.000-00"
+                value={cpf}
+                onChangeText={onCpfChange}
+                keyboardType="number-pad"
+                mask="cpf"
+                error={errors.cpf}
+                style={{ marginTop: 12 }}
+              />
+              <SvInput
+                label="E-MAIL"
+                placeholder="seuemail@exemplo.com"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                error={errors.email}
+                style={{ marginTop: 12 }}
+              />
+              <SvInput
+                label="SENHA"
+                placeholder="Crie uma senha"
+                value={senha}
+                onChangeText={setSenha}
+                secureTextEntry
+                secureToggle
+                error={errors.senha}
+                style={{ marginTop: 12 }}
+              />
+              <SvInput
+                label="CONFIRMAR SENHA"
+                placeholder="Repita a senha"
+                value={confirmSenha}
+                onChangeText={setConfirmSenha}
+                secureTextEntry
+                secureToggle
+                error={errors.confirmSenha}
+                style={{ marginTop: 12 }}
+                returnKeyType="next"
+              />
+              <SvInput
+                label="TELEFONE"
+                placeholder="(xx) xxxxx-xxxx"
+                value={numero}
+                onChangeText={onPhoneChange}
+                keyboardType="phone-pad"
+                mask="phone"
+                error={errors.numero}
+                style={{ marginTop: 12, marginBottom: 16 }}
+                returnKeyType="done"
+                onSubmitEditing={handleCadastro}
+              />
 
-                <View style={styles.cardContent}>
-                  <SvInput
-                    label="NOME COMPLETO"
-                    placeholder="Digite seu nome completo"
-                    value={nome}
-                    onChangeText={onNameChange}
-                    autoCapitalize="words"
-                    inputMode="text"
-                    maxLength={80}
-                    error={errors.nome}
-                  />
-                  <SvInput
-                    label="CPF"
-                    placeholder="000.000.000-00"
-                    value={cpf}
-                    onChangeText={onCpfChange}
-                    keyboardType="number-pad"
-                    mask="cpf"
-                    error={errors.cpf}
-                    style={{ marginTop: 12 }}
-                  />
-                  <SvInput
-                    label="E-MAIL"
-                    placeholder="seuemail@exemplo.com"
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    error={errors.email}
-                    style={{ marginTop: 12 }}
-                  />
-                  <SvInput
-                    label="SENHA"
-                    placeholder="Crie uma senha"
-                    value={senha}
-                    onChangeText={setSenha}
-                    secureTextEntry
-                    secureToggle
-                    error={errors.senha}
-                    style={{ marginTop: 12 }}
-                  />
-                  <SvInput
-                    label="CONFIRMAR SENHA"
-                    placeholder="Repita a senha"
-                    value={confirmSenha}
-                    onChangeText={setConfirmSenha}
-                    secureTextEntry
-                    secureToggle
-                    error={errors.confirmSenha}
-                    style={{ marginTop: 12 }}
-                    returnKeyType="next"
-                  />
-                  <SvInput
-                    label="TELEFONE"
-                    placeholder="(xx) xxxxx-xxxx"
-                    value={numero}
-                    onChangeText={onPhoneChange}
-                    keyboardType="phone-pad"
-                    mask="phone"
-                    error={errors.numero}
-                    style={{ marginTop: 12, marginBottom: 16 }}
-                    returnKeyType="done"
-                    onSubmitEditing={handleCadastro}
-                  />
-
-                  <SvButton
-                    title={loading ? "Enviando..." : "Pronto"}
-                    onPress={handleCadastro}
-                    loading={loading}
-                    disabled={loading}
-                  />
-                </View>
-              </View>
-            </View>
+              <SvButton
+                title={loading ? "Enviando..." : "Pronto"}
+                onPress={handleCadastro}
+                loading={loading}
+                disabled={loading}
+              />
+            </GlassCard>
           </Animated.View>
 
           {/* Botão voltar */}
@@ -471,34 +458,4 @@ const styles = StyleSheet.create({
     zIndex: 30,
     elevation: 30,
   },
-
-  shadowWrap: {
-    width: CARD_WIDTH,
-    borderRadius: RADIUS,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 14,
-  },
-  cardWrap: {
-    borderRadius: RADIUS,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    backgroundColor:
-      Platform.OS === "ios"
-        ? "rgba(255,255,255,0.10)"
-        : "rgba(255,255,255,0.16)",
-  },
-
-  blurLayer: { zIndex: 0 },
-  blurOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-    backgroundColor:
-      Platform.OS === "ios" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0)",
-  },
-
-  cardContent: { padding: 18, position: "relative", zIndex: 2 },
 });

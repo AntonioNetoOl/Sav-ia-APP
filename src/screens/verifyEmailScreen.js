@@ -1,7 +1,6 @@
-// src/screens/verifyEmailScreen.js
+// src/screens/VerifyEmailScreen.js
 import { Ionicons } from "@expo/vector-icons";
 //import { Asset } from "expo-asset";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -20,6 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { sendEmailCode, verifyEmailCode } from "../api/client";
+import GlassCard from "../components/glassCard";
 import SvButton from "../components/svButton";
 import SvInput from "../components/svInput";
 import useAuthAssets from "../hooks/useAuthAssets";
@@ -44,24 +44,6 @@ export default function VerifyEmailScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const emailParam = route?.params?.email || "";
   const alreadySent = !!route?.params?.alreadySent;
-
-  /*// Mitigação: pré-carregar asset do watermark
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const asset = Asset.fromModule(require("../../assets/Logo-savoia.png"));
-        await asset.downloadAsync();
-      } catch {
-        // fallback silencioso
-      } finally {
-        if (!alive) return;
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []); */
 
   useEffect(() => {
     if (!emailParam) {
@@ -143,7 +125,7 @@ export default function VerifyEmailScreen({ navigation, route }) {
 
   const backTop = Platform.OS === "web" ? 16 : (insets.top || 0) + 8;
 
-  // Timer de reenvio: usa "cooldown" se vier na navegação; senão, fallback em alreadySent
+  // Timer de reenvio
   const cooldownParam = Number(route?.params?.cooldown);
   const initialLeft = Number.isFinite(cooldownParam)
     ? Math.max(0, Math.min(RESEND_SECONDS, cooldownParam))
@@ -276,76 +258,65 @@ export default function VerifyEmailScreen({ navigation, route }) {
               ],
             }}
           >
-            <View
-              style={styles.shadowWrap}
-              renderToHardwareTextureAndroid={Platform.OS === "android"}
-              // Importante: NÃO usar shouldRasterizeIOS aqui (mesmo bug do “card branco” no iOS).
+            <GlassCard
+              width={CARD_WIDTH}
+              radius={RADIUS}
+              padding={18}
+              blur={Platform.OS === "ios"}
+              androidBlurMode="fallback"
+              androidElevation={0}
             >
-              <View style={styles.cardWrap}>
-                <BlurView
-                  intensity={Platform.OS === "ios" ? 18 : 30}
-                  tint={Platform.OS === "ios" ? "dark" : "light"}
-                  style={[StyleSheet.absoluteFill, styles.blurLayer]}
-                  pointerEvents="none"
-                />
-                <View style={styles.blurOverlay} pointerEvents="none" />
+              <Text style={styles.title}>Confirme seu e-mail</Text>
+              <Text style={styles.subtitle}>
+                Enviamos um código de 6 dígitos para {"\n"}
+                <Text style={{ fontWeight: "800", color: "#fff" }}>
+                  {emailParam}
+                </Text>
+              </Text>
 
-                <View style={styles.cardContent}>
-                  <Text style={styles.title}>Confirme seu e-mail</Text>
-                  <Text style={styles.subtitle}>
-                    Enviamos um código de 6 dígitos para {"\n"}
-                    <Text style={{ fontWeight: "800", color: "#fff" }}>
-                      {emailParam}
-                    </Text>
+              <SvInput
+                label="CÓDIGO"
+                placeholder="••••••"
+                value={code}
+                onChangeText={(t) => setCode(t.replace(/\D+/g, "").slice(0, 6))}
+                keyboardType="number-pad"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                importantForAutofill="no"
+                textContentType="oneTimeCode"
+                error={err}
+              />
+
+              <SvButton
+                title="Confirmar"
+                onPress={onConfirm}
+                loading={loading}
+                style={{ marginTop: 16 }}
+              />
+
+              <View style={{ marginTop: 12, alignItems: "center" }}>
+                <Pressable
+                  onPress={onResend}
+                  disabled={left > 0 || resendLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Reenviar código"
+                >
+                  <Text
+                    style={{
+                      color: left > 0 ? "rgba(255,255,255,0.6)" : "#fff",
+                      fontWeight: "900",
+                    }}
+                  >
+                    {resendLoading
+                      ? "Reenviando..."
+                      : left > 0
+                      ? `Reenviar código em ${left}s`
+                      : "Reenviar código"}
                   </Text>
-
-                  <SvInput
-                    label="CÓDIGO"
-                    placeholder="••••••"
-                    value={code}
-                    onChangeText={(t) =>
-                      setCode(t.replace(/\D+/g, "").slice(0, 6))
-                    }
-                    keyboardType="number-pad"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="off"
-                    importantForAutofill="no"
-                    textContentType="oneTimeCode"
-                    error={err}
-                  />
-
-                  <SvButton
-                    title="Confirmar"
-                    onPress={onConfirm}
-                    loading={loading}
-                    style={{ marginTop: 16 }}
-                  />
-
-                  <View style={{ marginTop: 12, alignItems: "center" }}>
-                    <Pressable
-                      onPress={onResend}
-                      disabled={left > 0 || resendLoading}
-                      accessibilityRole="button"
-                      accessibilityLabel="Reenviar código"
-                    >
-                      <Text
-                        style={{
-                          color: left > 0 ? "rgba(255,255,255,0.6)" : "#fff",
-                          fontWeight: "900",
-                        }}
-                      >
-                        {resendLoading
-                          ? "Reenviando..."
-                          : left > 0
-                          ? `Reenviar código em ${left}s`
-                          : "Reenviar código"}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
+                </Pressable>
               </View>
-            </View>
+            </GlassCard>
           </Animated.View>
         </View>
       </ScrollView>
@@ -411,36 +382,6 @@ const styles = StyleSheet.create({
     borderColor: "#072F20",
     backgroundColor: "transparent",
   },
-
-  shadowWrap: {
-    width: CARD_WIDTH,
-    borderRadius: 18,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 14,
-  },
-  cardWrap: {
-    borderRadius: RADIUS,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    backgroundColor:
-      Platform.OS === "ios"
-        ? "rgba(255,255,255,0.10)"
-        : "rgba(255,255,255,0.16)",
-  },
-
-  blurLayer: { zIndex: 0 },
-  blurOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-    backgroundColor:
-      Platform.OS === "ios" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0)",
-  },
-
-  cardContent: { padding: 18, position: "relative", zIndex: 2 },
 
   title: { color: "#fff", fontSize: 18, fontWeight: "900" },
   subtitle: {

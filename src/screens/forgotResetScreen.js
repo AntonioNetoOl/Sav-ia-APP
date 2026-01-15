@@ -1,7 +1,6 @@
-// src/screens/forgotResetScreen.js
+// src/screens/ForgotResetScreen.js
 import { Ionicons } from "@expo/vector-icons";
 //import { Asset } from "expo-asset";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -21,6 +20,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { forgotReset } from "../api/client";
+import GlassCard from "../components/glassCard";
 import SvButton from "../components/svButton";
 import SvInput from "../components/svInput";
 import useAuthAssets from "../hooks/useAuthAssets";
@@ -44,24 +44,6 @@ export default function ForgotResetScreen({ route, navigation }) {
   const backTop = Platform.OS === "web" ? 16 : (insets.top || 0) + 8;
   const token = route?.params?.token || "";
 
-  /*// Mitigação: pré-carregar asset do watermark para reduzir falhas intermitentes de render
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const asset = Asset.fromModule(require("../../assets/Logo-savoia.png"));
-        await asset.downloadAsync();
-      } catch {
-        // fallback silencioso
-      } finally {
-        if (!alive) return;
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []); */
-
   const [senha, setSenha] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState({ senha: "", confirm: "" });
@@ -77,6 +59,7 @@ export default function ForgotResetScreen({ route, navigation }) {
       useNativeDriver: true,
     }).start();
   }, [screenAnim]);
+
   const cardTranslateY = screenAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [16, 0],
@@ -137,10 +120,8 @@ export default function ForgotResetScreen({ route, navigation }) {
     });
   };
 
-  // voltar
   const handleBack = () => navigation.goBack();
 
-  // validação local
   const validate = () => {
     const e = {};
     if (!isStrongPassword(senha)) e.senha = "Senha muito curta (mín. 6).";
@@ -186,7 +167,6 @@ export default function ForgotResetScreen({ route, navigation }) {
     }
   };
 
-  // limpar erros ao digitar
   const onSenhaChange = (t) => {
     setSenha(t);
     if (errors.senha) setErrors((p) => ({ ...p, senha: "" }));
@@ -286,52 +266,43 @@ export default function ForgotResetScreen({ route, navigation }) {
               ],
             }}
           >
-            <View
-              style={styles.shadowWrap}
-              renderToHardwareTextureAndroid={Platform.OS === "android"}
-              // Importante: NÃO usar shouldRasterizeIOS aqui (pode quebrar o BlurView no iOS).
+            <GlassCard
+              width={CARD_WIDTH}
+              radius={RADIUS}
+              padding={18}
+              blur={Platform.OS === "ios"}
+              androidBlurMode="fallback"
+              androidElevation={0}
             >
-              <View style={styles.cardWrap}>
-                <BlurView
-                  intensity={Platform.OS === "ios" ? 18 : 30}
-                  tint={Platform.OS === "ios" ? "dark" : "light"}
-                  style={[StyleSheet.absoluteFill, styles.blurLayer]}
-                  pointerEvents="none"
-                />
-                <View style={styles.blurOverlay} pointerEvents="none" />
+              <Text style={styles.title}>Defina sua nova senha</Text>
 
-                <View style={styles.cardContent}>
-                  <Text style={styles.title}>Defina sua nova senha</Text>
+              <SvInput
+                label="NOVA SENHA"
+                placeholder="Crie uma senha"
+                value={senha}
+                onChangeText={onSenhaChange}
+                secureTextEntry
+                secureToggle
+                error={errors.senha}
+              />
+              <SvInput
+                label="CONFIRMAR NOVA SENHA"
+                placeholder="Repita a senha"
+                value={confirm}
+                onChangeText={onConfirmChange}
+                secureTextEntry
+                secureToggle
+                style={{ marginTop: 12 }}
+                error={errors.confirm}
+              />
 
-                  <SvInput
-                    label="NOVA SENHA"
-                    placeholder="Crie uma senha"
-                    value={senha}
-                    onChangeText={onSenhaChange}
-                    secureTextEntry
-                    secureToggle
-                    error={errors.senha}
-                  />
-                  <SvInput
-                    label="CONFIRMAR NOVA SENHA"
-                    placeholder="Repita a senha"
-                    value={confirm}
-                    onChangeText={onConfirmChange}
-                    secureTextEntry
-                    secureToggle
-                    style={{ marginTop: 12 }}
-                    error={errors.confirm}
-                  />
-
-                  <SvButton
-                    title="Salvar"
-                    onPress={handleReset}
-                    loading={loading}
-                    style={{ marginTop: 16 }}
-                  />
-                </View>
-              </View>
-            </View>
+              <SvButton
+                title="Salvar"
+                onPress={handleReset}
+                loading={loading}
+                style={{ marginTop: 16 }}
+              />
+            </GlassCard>
           </Animated.View>
         </View>
       </ScrollView>
@@ -395,36 +366,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     zIndex: 5,
   },
-
-  shadowWrap: {
-    width: CARD_WIDTH,
-    borderRadius: RADIUS,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 14,
-  },
-  cardWrap: {
-    borderRadius: RADIUS,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    backgroundColor:
-      Platform.OS === "ios"
-        ? "rgba(255,255,255,0.10)"
-        : "rgba(255,255,255,0.16)",
-  },
-
-  blurLayer: { zIndex: 0 },
-  blurOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-    backgroundColor:
-      Platform.OS === "ios" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0)",
-  },
-
-  cardContent: { padding: 18, position: "relative", zIndex: 2 },
 
   title: { color: "#fff", fontSize: 18, fontWeight: "900", marginBottom: 10 },
 });
