@@ -1,6 +1,8 @@
 // src/navigation/appNavigator.js
 import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import * as SystemUI from "expo-system-ui";
+import { useEffect } from "react";
 import { Platform, View } from "react-native";
 
 import CadastroScreen from "../screens/cadastroScreen";
@@ -16,6 +18,7 @@ import VerifyEmailScreen from "../screens/verifyEmailScreen";
 const Stack = createNativeStackNavigator();
 
 export const STACK_BG = "#05271A";
+const IS_ANDROID = Platform.OS === "android";
 
 const SavTheme = {
   ...DefaultTheme,
@@ -39,12 +42,18 @@ const modalLike = Platform.select({
   default: {
     presentation: "card",
     animation: "fade",
-    detachPreviousScreen: true,
+    detachPreviousScreen: IS_ANDROID ? false : true,
     contentStyle: { backgroundColor: STACK_BG },
   },
 });
 
 export default function AppNavigator() {
+  useEffect(() => {
+    if (IS_ANDROID) {
+      SystemUI.setBackgroundColorAsync(STACK_BG).catch(() => {});
+    }
+  }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: STACK_BG }}>
       <NavigationContainer theme={SavTheme}>
@@ -55,20 +64,20 @@ export default function AppNavigator() {
             headerShadowVisible: false,
             contentStyle: { backgroundColor: STACK_BG },
             gestureEnabled: true,
-            // ⚠️ No iOS (Expo Go) não alteramos a Status Bar
-            ...(Platform.OS === "android"
+
+            detachPreviousScreen: IS_ANDROID ? false : true,
+
+            ...(IS_ANDROID
               ? { statusBarStyle: "light", statusBarColor: STACK_BG }
               : {}),
           }}
         >
-          {/* SPLASH */}
           <Stack.Screen
             name="Splash"
             component={SplashScreen}
             options={{ headerShown: false, gestureEnabled: false }}
           />
 
-          {/* PÚBLICAS */}
           <Stack.Screen
             name="Login"
             component={LoginScreen}
@@ -81,7 +90,6 @@ export default function AppNavigator() {
             options={{ headerShown: false, ...modalLike }}
           />
 
-          {/* SPRINT 2 */}
           <Stack.Screen
             name="VerifyEmail"
             component={VerifyEmailScreen}
@@ -106,7 +114,6 @@ export default function AppNavigator() {
             options={{ headerShown: false, ...modalLike }}
           />
 
-          {/* PRIVADAS */}
           <Stack.Screen
             name="Home"
             component={HomeScreen}

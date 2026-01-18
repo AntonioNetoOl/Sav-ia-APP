@@ -77,7 +77,7 @@ export default function ForgotEmailScreen({ navigation, route }) {
           duration: 3800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     loop.start();
     return () => loop.stop();
@@ -141,15 +141,11 @@ export default function ForgotEmailScreen({ navigation, route }) {
         payload.message ||
         "Não foi possível iniciar a recuperação.";
 
-      if (status === 404) {
-        setError("Usuário não encontrado para este e-mail.");
-      } else if (status === 429) {
+      if (status === 404) setError("Usuário não encontrado para este e-mail.");
+      else if (status === 429)
         setError("Aguarde alguns segundos antes de solicitar novo código.");
-      } else if (status === 400) {
-        setError("E-mail inválido.");
-      } else {
-        setError(msg);
-      }
+      else if (status === 400) setError("E-mail inválido.");
+      else setError(msg);
     } finally {
       setLoading(false);
     }
@@ -157,7 +153,7 @@ export default function ForgotEmailScreen({ navigation, route }) {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: BG }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <StatusBar barStyle="light-content" backgroundColor={BG} />
@@ -197,6 +193,8 @@ export default function ForgotEmailScreen({ navigation, route }) {
                 style={styles.watermarkImage}
                 resizeMode="contain"
                 accessible={false}
+                // ✅ evita “fade-in” de imagem no Android
+                fadeDuration={0}
               />
               <View style={styles.ringMask} />
             </Animated.View>
@@ -298,7 +296,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.25)",
   },
 
-  // Watermark / logo
   watermarkWrap: {
     position: "absolute",
     top: LOGO_TOP,
