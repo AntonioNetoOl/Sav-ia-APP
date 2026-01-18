@@ -88,7 +88,7 @@ export default function CadastroScreen({ navigation }) {
           duration: 3800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     loop.start();
     return () => loop.stop();
@@ -185,7 +185,7 @@ export default function CadastroScreen({ navigation }) {
       } else if (status === 429) {
         Alert.alert(
           "Ops!",
-          "Aguarde alguns segundos antes de solicitar novo código."
+          "Aguarde alguns segundos antes de solicitar novo código.",
         );
         navigation.navigate("VerifyEmail", {
           email: form.email,
@@ -219,8 +219,14 @@ export default function CadastroScreen({ navigation }) {
   const BACK_SIZE = 40;
   const BACK_GAP = 12;
 
-  // top real do botão, respeitando notch
-  const backTop = Platform.OS === "web" ? 16 : (insets.top || 0) + 8;
+  // top real do botão, respeitando notch / status bar (fallback Android)
+  const androidStatusBarH =
+    Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
+  const safeTop =
+    Platform.OS === "web"
+      ? 16
+      : Math.max(insets.top || 0, androidStatusBarH) + 8;
+  const backTop = safeTop;
 
   // reserva de espaço para o card não “entrar” atrás do botão
   const headerSpace = backTop + BACK_SIZE + BACK_GAP;
@@ -230,66 +236,70 @@ export default function CadastroScreen({ navigation }) {
       style={{ flex: 1, backgroundColor: BG }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor={BG} />
+      <StatusBar
+        barStyle="light-content"
+        translucent={Platform.OS === "android"}
+        backgroundColor="transparent"
+      />
 
-      <ScrollView
-        style={{ flex: 1, backgroundColor: BG }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          minHeight: height,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: BG,
-          paddingTop: headerSpace,
-          paddingBottom: 24,
-        }}
-        keyboardShouldPersistTaps="handled"
-        overScrollMode="never"
-      >
-        <View style={styles.container} pointerEvents="box-none">
-          {/* Fundo */}
-          <Animated.View
-            style={[StyleSheet.absoluteFill, { opacity: cardOpacity }]}
-            pointerEvents="none"
-          >
-            <LinearGradient
-              colors={GRADIENT_COLORS}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </Animated.View>
+      <View style={styles.screen} pointerEvents="box-none">
+        {/* Fundo (fora do ScrollView para cobrir 100% da tela) */}
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { opacity: cardOpacity }]}
+          pointerEvents="none"
+        >
+          <LinearGradient
+            colors={GRADIENT_COLORS}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
 
-          {/* Watermark */}
+        {/* Watermark */}
+        <Animated.View
+          style={[styles.watermarkWrap, { opacity: wmOpacity }]}
+          pointerEvents="none"
+          collapsable={false}
+        >
           <Animated.View
-            style={[styles.watermarkWrap, { opacity: wmOpacity }]}
+            style={[
+              styles.watermarkClip,
+              {
+                transform: [
+                  { scale: Animated.multiply(wmScale, breatheScale) },
+                ],
+              },
+            ]}
             pointerEvents="none"
             collapsable={false}
           >
-            <Animated.View
-              style={[
-                styles.watermarkClip,
-                {
-                  transform: [
-                    { scale: Animated.multiply(wmScale, breatheScale) },
-                  ],
-                },
-              ]}
-              pointerEvents="none"
-              collapsable={false}
-            >
-              <Image
-                key="wm-cadastro"
-                source={require("../../assets/Logo-savoia.png")}
-                style={styles.watermarkImage}
-                resizeMode="contain"
-                accessible={false}
-                fadeDuration={0}
-              />
-              <View style={styles.ringMask} />
-            </Animated.View>
+            <Image
+              key="wm-cadastro"
+              source={require("../../assets/Logo-savoia.png")}
+              style={styles.watermarkImage}
+              resizeMode="contain"
+              accessible={false}
+              fadeDuration={0}
+            />
+            <View style={styles.ringMask} />
           </Animated.View>
+        </Animated.View>
 
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            minHeight: height,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "transparent",
+            paddingTop: headerSpace,
+            paddingBottom: 24,
+          }}
+          keyboardShouldPersistTaps="handled"
+          overScrollMode="never"
+        >
           {/* Card */}
           <Animated.View
             style={{
@@ -376,37 +386,33 @@ export default function CadastroScreen({ navigation }) {
               />
             </GlassCard>
           </Animated.View>
+        </ScrollView>
 
-          {/* Botão voltar */}
-          <Animated.View
-            style={[styles.backBtn, { opacity: backOpacity, top: backTop }]}
+        {/* Botão voltar (fora do ScrollView) */}
+        <Animated.View
+          style={[styles.backBtn, { opacity: backOpacity, top: backTop }]}
+        >
+          <Pressable
+            onPress={handleBack}
+            hitSlop={10}
+            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
           >
-            <Pressable
-              onPress={handleBack}
-              hitSlop={10}
-              style={{
-                flex: 1,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="arrow-back" size={26} color="#fff" />
-            </Pressable>
-          </Animated.View>
-        </View>
-      </ScrollView>
+            <Ionicons name="arrow-back" size={26} color="#fff" />
+          </Pressable>
+        </Animated.View>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     width: "100%",
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "transparent",
+    backgroundColor: BG, // fallback se o gradiente não renderizar por algum motivo
   },
 
   // watermark
