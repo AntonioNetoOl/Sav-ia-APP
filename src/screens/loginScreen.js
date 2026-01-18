@@ -1,6 +1,6 @@
 // src/screens/LoginScreen.js
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -40,6 +40,42 @@ const LOGO_SCALE = 1.02;
 const EDGE_HIDE = Math.max(6, Math.round(width * 0.012));
 const LOGO_TOP = height * 0.065;
 
+// Mantém o require estável (não recria source em re-render)
+const WATERMARK_SRC = require("../../assets/Logo-savoia.png");
+
+const BackgroundLayer = memo(function BackgroundLayer({ breatheScale }) {
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <LinearGradient
+        colors={GRADIENT_COLORS}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* LOGO / watermark */}
+      <View style={styles.watermarkWrap}>
+        <Animated.View
+          style={[
+            styles.watermarkClip,
+            { transform: [{ scale: breatheScale }] },
+          ]}
+        >
+          <Image
+            source={WATERMARK_SRC}
+            style={styles.watermarkImage}
+            resizeMode="contain"
+            accessible={false}
+            // Remove fade padrão no Android que pode parecer “piscada”
+            fadeDuration={0}
+          />
+          <View style={styles.ringMask} />
+        </Animated.View>
+      </View>
+    </View>
+  );
+});
+
 export default function LoginScreen({ navigation }) {
   useAuthAssets();
 
@@ -51,7 +87,8 @@ export default function LoginScreen({ navigation }) {
       duration: 420,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [cardAnim]);
+
   const breathe = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -66,15 +103,30 @@ export default function LoginScreen({ navigation }) {
           duration: 3800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     loop.start();
     return () => loop.stop();
-  }, []);
-  const breatheScale = breathe.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.02],
-  });
+  }, [breathe]);
+
+  // Evita recriar nós de interpolação em cada re-render (ex.: toggle CPF/E-mail)
+  const breatheScale = useMemo(
+    () =>
+      breathe.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 1.02],
+      }),
+    [breathe],
+  );
+
+  const cardTranslateY = useMemo(
+    () =>
+      cardAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [12, 0],
+      }),
+    [cardAnim],
+  );
 
   // ======= estado do formulário =======
   const [mode, setMode] = useState("cpf"); // "cpf" | "email"
@@ -115,9 +167,7 @@ export default function LoginScreen({ navigation }) {
       const msg =
         err?.response?.data?.erro ||
         err?.response?.data?.message ||
-        `Request failed with status code ${
-          err?.response?.status || ""
-        }`.trim() ||
+        `Request failed with status code ${err?.response?.status || ""}`.trim() ||
         "Erro ao entrar.";
       setErrors((prev) => ({ ...prev, senha: msg }));
       console.log("LOGIN_ERROR:", err?.response?.data || err?.message);
@@ -138,43 +188,13 @@ export default function LoginScreen({ navigation }) {
         overScrollMode="never"
       >
         <View style={styles.container}>
-          <LinearGradient
-            colors={GRADIENT_COLORS}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-
-          {/* LOGO */}
-          <View style={styles.watermarkWrap} pointerEvents="none">
-            <Animated.View
-              style={[
-                styles.watermarkClip,
-                { transform: [{ scale: breatheScale }] },
-              ]}
-            >
-              <Image
-                source={require("../../assets/Logo-savoia.png")}
-                style={styles.watermarkImage}
-                resizeMode="contain"
-                accessible={false}
-              />
-              <View style={styles.ringMask} />
-            </Animated.View>
-          </View>
+          <BackgroundLayer breatheScale={breatheScale} />
 
           {/* Card */}
           <Animated.View
             style={{
               opacity: cardAnim,
-              transform: [
-                {
-                  translateY: cardAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [12, 0],
-                  }),
-                },
-              ],
+              transform: [{ translateY: cardTranslateY }],
             }}
           >
             <GlassCard
@@ -315,14 +335,15 @@ const styles = StyleSheet.create({
   watermarkWrap: {
     position: "absolute",
     top: LOGO_TOP,
+    left: 0,
+    right: 0,
     alignItems: "center",
     justifyContent: "center",
-    width: LOGO_SIZE,
     height: LOGO_SIZE,
   },
   watermarkClip: {
-    width: "100%",
-    height: "100%",
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
     borderRadius: LOGO_SIZE / 2,
     overflow: "hidden",
     position: "relative",
