@@ -14,23 +14,14 @@ export default function GlassCard({
   contentStyle,
   shadowStyle,
 
-  // agora funciona:
   blur = true,
 
-  /**
-   * Android: para eliminar artefatos, o padrão é "fallback" (sem BlurView).
-   * - "fallback": nunca usa BlurView no Android
-   * - "native": usa BlurView apenas no Android 31+
-   */
   androidBlurMode = "fallback",
 
-  // ajustes finos
   blurIntensity = 18,
 
-  // controla sombra no Android (padrão: 0 para não criar “placa”)
   androidElevation = 0,
 
-  // deixa o “vidro” mais claro no Android (padrão mais alto que o seu)
   scrimOpacityIOS = 0.06,
   scrimOpacityAndroid = 0.14,
   scrimOpacityWeb = 0.08,
@@ -59,10 +50,8 @@ export default function GlassCard({
     default: 0.08,
   });
 
-  // Fundo base (não transparente) para evitar “placa”/artefato do elevation no Android
   const baseBg = `rgba(255,255,255,${scrimOpacity})`;
 
-  // Sombra: iOS ok; Android desliga por padrão (androidElevation = 0)
   const outerShadow = Platform.select({
     ios: styles.shadowIOS,
     android: androidElevation > 0 ? { elevation: androidElevation } : null,
