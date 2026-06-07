@@ -64,9 +64,7 @@ export default function AppNavigator() {
             headerShadowVisible: false,
             contentStyle: { backgroundColor: STACK_BG },
             gestureEnabled: true,
-
             detachPreviousScreen: IS_ANDROID ? false : true,
-
             ...(IS_ANDROID
               ? { statusBarStyle: "light", statusBarColor: STACK_BG }
               : {}),
@@ -118,9 +116,7 @@ export default function AppNavigator() {
             name="Home"
             component={HomeScreen}
             options={{
-              title: "Savóia",
-              headerStyle: { backgroundColor: STACK_BG },
-              headerTintColor: "#fff",
+              headerShown: false,
               animation: "fade_from_bottom",
             }}
           />
