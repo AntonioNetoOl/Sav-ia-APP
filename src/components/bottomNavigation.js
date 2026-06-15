@@ -65,13 +65,13 @@ export default function BottomNavigation({ activeKey = "home", navigation }) {
       return;
     }
 
-    if (key === "carteirinha") {
-      Alert.alert("Carteirinha", "A aba Carteirinha será implementada na próxima etapa.");
+    if (key === "socio") {
+      navigation.navigate("Socio");
       return;
     }
 
-    if (key === "socio") {
-      Alert.alert("Sócio", "A aba Sócio será implementada na próxima etapa.");
+    if (key === "carteirinha") {
+      Alert.alert("Carteirinha", "A aba Carteirinha será implementada na próxima etapa.");
     }
   };
 
