@@ -28,11 +28,14 @@ const GRADIENT_COLORS = ["#083726", "#072F20", "#05271A"];
 const TOP_LOGO_SRC = require("../../assets/savoia-cruz.png");
 const WATERMARK_SRC = require("../../assets/Logo-savoia.png");
 
-const TOP_SPACING = Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 24;
+const TOP_SPACING =
+  Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 24;
 const CARD_WIDTH = width;
 const PANEL_PADDING = 18;
 const GRID_GAP = 12;
-const GRID_CARD_WIDTH = Math.floor((CARD_WIDTH - PANEL_PADDING * 2 - GRID_GAP) / 2);
+const GRID_CARD_WIDTH = Math.floor(
+  (CARD_WIDTH - PANEL_PADDING * 2 - GRID_GAP) / 2,
+);
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -65,7 +68,10 @@ function MenuCard({ label, icon, iconLib = "ion", onPress }) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.menuCard, pressed && styles.menuCardPressed]}
+      style={({ pressed }) => [
+        styles.menuCard,
+        pressed && styles.menuCardPressed,
+      ]}
     >
       <View style={styles.menuIconWrap}>
         <IconComponent name={icon} size={31} color="rgba(241,230,168,0.78)" />
@@ -123,69 +129,165 @@ export default function MenuScreen({ navigation }) {
 
   const handleSupportEmail = () => {
     if (!EXTERNAL_LINKS.supportEmail) {
-      Alert.alert("Atendimento", "O e-mail oficial de atendimento será configurado em breve.");
+      Alert.alert(
+        "Atendimento",
+        "O e-mail oficial de atendimento será configurado em breve.",
+      );
       return;
     }
 
     const subject = encodeURIComponent("Atendimento APP Savóia");
-    openUrl(`mailto:${EXTERNAL_LINKS.supportEmail}?subject=${subject}`, "Atendimento");
+    openUrl(
+      `mailto:${EXTERNAL_LINKS.supportEmail}?subject=${subject}`,
+      "Atendimento",
+    );
   };
 
   const handleRateApp = () => {
-    const url = Platform.OS === "ios" ? EXTERNAL_LINKS.appStoreUrl : EXTERNAL_LINKS.googlePlayUrl;
+    const url =
+      Platform.OS === "ios"
+        ? EXTERNAL_LINKS.appStoreUrl
+        : EXTERNAL_LINKS.googlePlayUrl;
     openUrl(url, "Avaliação do app");
   };
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={SCREEN_BG} />
-      <LinearGradient colors={GRADIENT_COLORS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-      <Image source={WATERMARK_SRC} resizeMode="contain" style={styles.watermark} fadeDuration={0} />
+      <LinearGradient
+        colors={GRADIENT_COLORS}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <Image
+        source={WATERMARK_SRC}
+        resizeMode="contain"
+        style={styles.watermark}
+        fadeDuration={0}
+      />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} overScrollMode="never">
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        overScrollMode="never"
+      >
         <View style={styles.header}>
-          <Image source={TOP_LOGO_SRC} resizeMode="contain" style={styles.logo} fadeDuration={0} />
-          <Text style={styles.greeting}>{getGreeting()}, {displayName}</Text>
-          <Pressable onPress={() => navigation.navigate("Profile")} style={({ pressed }) => [styles.profileButton, pressed && { opacity: 0.86 }]}>
+          <Image
+            source={TOP_LOGO_SRC}
+            resizeMode="contain"
+            style={styles.logo}
+            fadeDuration={0}
+          />
+          <Text style={styles.greeting}>
+            {getGreeting()}, {displayName}
+          </Text>
+          <Pressable
+            onPress={() => navigation.navigate("Profile")}
+            style={({ pressed }) => [
+              styles.profileButton,
+              pressed && { opacity: 0.86 },
+            ]}
+          >
             <Ionicons name="person-outline" size={19} color="#F1E6A8" />
             <Text style={styles.profileButtonText}>Acessar meu perfil</Text>
           </Pressable>
-          <Text style={styles.description}>Acesse sua conta, benefícios, pagamentos, sedes e suporte.</Text>
+          <Text style={styles.description}>
+            Acesse sua conta, benefícios, pagamentos, sedes e suporte.
+          </Text>
         </View>
 
         <View style={styles.menuPanel}>
           <MenuSection title="Sede social">
-            <MenuCard label="Sede" icon="location-outline" onPress={() => openUrl(EXTERNAL_LINKS.sedeMapsUrl, "Sede social")} />
-            <MenuCard label="Subsedes" icon="map-marker-multiple-outline" iconLib="mci" onPress={() => navigation.navigate("Subsedes")} />
+            <MenuCard
+              label="Sede"
+              icon="location-outline"
+              onPress={() => openUrl(EXTERNAL_LINKS.sedeMapsUrl, "Sede social")}
+            />
+            <MenuCard
+              label="Subsedes"
+              icon="map-marker-multiple-outline"
+              iconLib="mci"
+              onPress={() => navigation.navigate("Subsedes")}
+            />
           </MenuSection>
 
           <View style={styles.divider} />
 
           <MenuSection title="Seção Sócio">
-            <MenuCard label="Minha associação" icon="shield-star-outline" iconLib="mci" onPress={() => Alert.alert("Sócio", "A aba Sócio será implementada na próxima etapa.")} />
-            <MenuCard label="Como funciona\na fidelidade" icon="gift-outline" iconLib="mci" onPress={() => navigation.navigate("LoyaltyInfo")} />
-            <MenuCard label="Meus benefícios" icon="ticket-percent-outline" iconLib="mci" onPress={() => navigation.navigate("Benefits")} />
+            <MenuCard
+              label="Minha associação"
+              icon="shield-star-outline"
+              iconLib="mci"
+              onPress={() =>
+                Alert.alert(
+                  "Sócio",
+                  "A aba Sócio será implementada na próxima etapa.",
+                )
+              }
+            />
+            <MenuCard
+              label="Como funciona a fidelidade"
+              icon="gift-outline"
+              iconLib="mci"
+              onPress={() => navigation.navigate("LoyaltyInfo")}
+            />
+            <MenuCard
+              label="Meus benefícios"
+              icon="ticket-percent-outline"
+              iconLib="mci"
+              onPress={() => navigation.navigate("Benefits")}
+            />
           </MenuSection>
 
           <View style={styles.divider} />
 
           <MenuSection title="Pagamentos">
-            <MenuCard label="Histórico de\npagamentos" icon="receipt-outline" onPress={() => navigation.navigate("Payments", { initialTab: "history" })} />
-            <MenuCard label="Cartões\ncadastrados" icon="credit-card-outline" iconLib="mci" onPress={() => navigation.navigate("Payments", { initialTab: "cards" })} />
+            <MenuCard
+              label="Histórico de pagamentos"
+              icon="receipt-outline"
+              onPress={() =>
+                navigation.navigate("Payments", { initialTab: "history" })
+              }
+            />
+            <MenuCard
+              label="Cartões cadastrados"
+              icon="credit-card-outline"
+              iconLib="mci"
+              onPress={() =>
+                navigation.navigate("Payments", { initialTab: "cards" })
+              }
+            />
           </MenuSection>
 
           <View style={styles.divider} />
 
           <MenuSection title="Ajuda">
-            <MenuCard label="Falar com\na Savóia" icon="mail-outline" onPress={handleSupportEmail} />
-            <MenuCard label="Dúvidas\nfrequentes" icon="help-circle-outline" onPress={() => navigation.navigate("FAQ")} />
+            <MenuCard
+              label="Falar com a Savóia"
+              icon="mail-outline"
+              onPress={handleSupportEmail}
+            />
+            <MenuCard
+              label="Dúvidas frequentes"
+              icon="help-circle-outline"
+              onPress={() => navigation.navigate("FAQ")}
+            />
           </MenuSection>
 
           <View style={styles.divider} />
 
           <MenuSection title="Conta">
-            <MenuCard label="Configurações" icon="settings-outline" onPress={() => navigation.navigate("Settings")} />
-            <MenuCard label="Termos e\nprivacidade" icon="document-text-outline" onPress={() => navigation.navigate("TermsPrivacy")} />
+            <MenuCard
+              label="Configurações"
+              icon="settings-outline"
+              onPress={() => navigation.navigate("Settings")}
+            />
+            <MenuCard
+              label="Termos e\nprivacidade"
+              icon="document-text-outline"
+              onPress={() => navigation.navigate("TermsPrivacy")}
+            />
           </MenuSection>
 
           <View style={styles.ratingCard}>
@@ -194,14 +296,30 @@ export default function MenuScreen({ navigation }) {
             </View>
             <View style={styles.ratingTextBlock}>
               <Text style={styles.ratingTitle}>Gostando do app?</Text>
-              <Text style={styles.ratingText}>Avalie a Savóia e ajude a melhorar nossa experiência.</Text>
+              <Text style={styles.ratingText}>
+                Avalie a Savóia e ajude a melhorar nossa experiência.
+              </Text>
             </View>
-            <Pressable onPress={handleRateApp} style={({ pressed }) => [styles.ratingButton, pressed && { opacity: 0.86 }]}>
-              <Text style={styles.ratingButtonText}>{Platform.OS === "ios" ? "App Store" : "Google Play"}</Text>
+            <Pressable
+              onPress={handleRateApp}
+              style={({ pressed }) => [
+                styles.ratingButton,
+                pressed && { opacity: 0.86 },
+              ]}
+            >
+              <Text style={styles.ratingButtonText}>
+                {Platform.OS === "ios" ? "App Store" : "Google Play"}
+              </Text>
             </Pressable>
           </View>
 
-          <Pressable onPress={handleLogout} style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.76 }]}>
+          <Pressable
+            onPress={handleLogout}
+            style={({ pressed }) => [
+              styles.logoutButton,
+              pressed && { opacity: 0.76 },
+            ]}
+          >
             <Ionicons name="log-out-outline" size={20} color="#B72E2E" />
             <Text style={styles.logoutText}>Sair da conta</Text>
           </Pressable>
