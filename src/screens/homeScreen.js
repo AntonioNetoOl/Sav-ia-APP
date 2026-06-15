@@ -300,14 +300,7 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleProfilePress = () => {
-    Alert.alert(
-      "Perfil",
-      "A área de perfil/menu será implementada na próxima etapa.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Sair", style: "destructive", onPress: handleLogout },
-      ],
-    );
+    navigation.navigate("Profile");
   };
 
   const handleBellPress = () => {
@@ -354,7 +347,7 @@ export default function HomeScreen({ navigation }) {
     }
 
     if (key === "menu") {
-      Alert.alert("Menu", "A aba Menu será implementada na próxima etapa.");
+      navigation.navigate("Menu");
     }
   };
 

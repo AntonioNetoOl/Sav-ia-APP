@@ -1,4 +1,6 @@
 // src/constants/config.js
+export const TOKEN_FIELD = "token";
+
 export const API_PATHS = {
   login: "/api/usuarios/login",
 
@@ -13,4 +15,9 @@ export const API_PATHS = {
   forgotStart:  "/api/usuarios/auth/forgot/start",
   forgotVerify: "/api/usuarios/auth/forgot/verify",
   forgotReset:  "/api/usuarios/auth/forgot/reset",
+
+  me: "/api/me",
+  mePayments: "/api/me/payments",
+  mePaymentCards: "/api/me/payment-cards",
+  meBenefits: "/api/me/benefits",
 };
