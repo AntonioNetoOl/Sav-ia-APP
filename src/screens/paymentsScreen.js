@@ -33,12 +33,11 @@ function normalizeTab(tab) {
 }
 
 function formatCurrency(value) {
-  const amount = Number(value || 0);
-  return amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function formatDate(dateString) {
-  if (!dateString) return "Data não informada";
+  if (!dateString) return "Aguardando confirmação";
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return dateString;
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -46,16 +45,16 @@ function formatDate(dateString) {
 
 function getPaymentStatus(status) {
   const normalized = String(status || "").toLowerCase();
-  if (["confirmed", "paid", "pago", "confirmado"].includes(normalized)) {
-    return { label: "Pago", style: styles.statusPaid };
-  }
-  if (["pending", "pendente"].includes(normalized)) {
-    return { label: "Pendente", style: styles.statusPending };
-  }
-  if (["failed", "recused", "recusado", "falhou"].includes(normalized)) {
-    return { label: "Falhou", style: styles.statusFailed };
-  }
+  if (["confirmed", "paid", "pago", "confirmado"].includes(normalized)) return { label: "Pago", style: styles.statusPaid };
+  if (["pending", "pendente"].includes(normalized)) return { label: "Pendente", style: styles.statusPending };
+  if (["failed", "recused", "recusado", "falhou"].includes(normalized)) return { label: "Falhou", style: styles.statusFailed };
   return { label: status || "Indefinido", style: styles.statusNeutral };
+}
+
+function getCardExpiration(card) {
+  const month = card.expMonth || card.expirationMonth || "--";
+  const year = card.expYear || card.expirationYear || "----";
+  return `${month}/${year}`;
 }
 
 function BackButton({ navigation }) {
@@ -89,27 +88,22 @@ function EmptyState({ icon, title, description }) {
 
 function PaymentHistory({ payments, loading, error }) {
   if (loading) return <ActivityIndicator color="#0C6A3D" style={styles.loader} />;
-  if (error) {
-    return (
-      <EmptyState icon="warning-outline" title="Não foi possível carregar" description="Tente novamente em alguns instantes." />
-    );
-  }
-  if (!payments.length) {
-    return (
-      <EmptyState icon="receipt-outline" title="Nenhum pagamento encontrado" description="Quando houver mensalidades ou cobranças, elas aparecerão aqui." />
-    );
-  }
+  if (error) return <EmptyState icon="warning-outline" title="Não foi possível carregar" description="Tente novamente em alguns instantes." />;
+  if (!payments.length) return <EmptyState icon="receipt-outline" title="Nenhum pagamento encontrado" description="Quando houver mensalidades ou cobranças, elas aparecerão aqui." />;
 
   return payments.map((payment) => {
     const status = getPaymentStatus(payment.status);
+    const dateText = payment.paidAt ? `Pago em ${formatDate(payment.paidAt)}` : formatDate(payment.paidAt);
+    const subtitle = [payment.competenceLabel, dateText, payment.methodLabel].filter(Boolean).join(" · ");
+
     return (
       <View key={payment.id} style={styles.paymentCard}>
         <View style={styles.paymentIconWrap}>
           <Ionicons name="receipt-outline" size={24} color="#F1E6A8" />
         </View>
         <View style={styles.paymentInfo}>
-          <Text style={styles.paymentTitle}>{payment.description || "Pagamento Savóia"}</Text>
-          <Text style={styles.paymentDate}>{formatDate(payment.date || payment.dueDate || payment.createdAt)}</Text>
+          <Text style={styles.paymentTitle}>{payment.title || payment.description || "Pagamento Savóia"}</Text>
+          <Text style={styles.paymentDate}>{subtitle}</Text>
         </View>
         <View style={styles.paymentRight}>
           <Text style={styles.paymentAmount}>{formatCurrency(payment.amount)}</Text>
@@ -124,9 +118,7 @@ function PaymentHistory({ payments, loading, error }) {
 
 function CardsList({ cards, loading, error, onAddCard }) {
   if (loading) return <ActivityIndicator color="#0C6A3D" style={styles.loader} />;
-  if (error) {
-    return <EmptyState icon="warning-outline" title="Não foi possível carregar" description="Não conseguimos buscar seus cartões agora." />;
-  }
+  if (error) return <EmptyState icon="warning-outline" title="Não foi possível carregar" description="Não conseguimos buscar seus cartões agora." />;
   if (!cards.length) {
     return (
       <View>
@@ -147,7 +139,7 @@ function CardsList({ cards, loading, error, onAddCard }) {
           </View>
           <View style={styles.cardInfo}>
             <Text style={styles.cardTitle}>{card.brand || "Cartão"} final {card.last4 || "****"}</Text>
-            <Text style={styles.cardSubtitle}>Validade {card.expMonth || "--"}/{card.expYear || "----"}</Text>
+            <Text style={styles.cardSubtitle}>Validade {getCardExpiration(card)}</Text>
           </View>
           {card.isDefault && (
             <View style={styles.defaultPill}>
@@ -171,9 +163,7 @@ function AddCardPlaceholder() {
         <MaterialCommunityIcons name="credit-card-plus-outline" size={38} color="#F1E6A8" />
       </View>
       <Text style={styles.addCardTitle}>Cadastro de cartão em preparação</Text>
-      <Text style={styles.addCardText}>
-        Esta área está reservada para a futura integração com gateway de pagamento. Por segurança, o app ainda não coleta número de cartão, CVV ou dados sensíveis nesta versão.
-      </Text>
+      <Text style={styles.addCardText}>Esta área está reservada para a futura integração com gateway de pagamento. Por segurança, o app ainda não coleta número de cartão, CVV ou dados sensíveis nesta versão.</Text>
       <Pressable onPress={() => Alert.alert("Em breve", "O cadastro de cartão será liberado após a integração financeira.")} style={({ pressed }) => [styles.disabledAction, pressed && { opacity: 0.84 }]}> 
         <Text style={styles.disabledActionText}>Disponível em breve</Text>
       </Pressable>
@@ -192,10 +182,7 @@ export default function PaymentsScreen({ navigation, route }) {
   const loadData = useCallback(async () => {
     setError(false);
     try {
-      const [paymentsResponse, cardsResponse] = await Promise.all([
-        getMePayments(),
-        getMePaymentCards(),
-      ]);
+      const [paymentsResponse, cardsResponse] = await Promise.all([getMePayments(), getMePaymentCards()]);
       setPayments(Array.isArray(paymentsResponse.data) ? paymentsResponse.data : []);
       setCards(Array.isArray(cardsResponse.data) ? cardsResponse.data : []);
     } catch (_err) {
@@ -225,39 +212,21 @@ export default function PaymentsScreen({ navigation, route }) {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={SCREEN_BG} />
       <LinearGradient colors={GRADIENT_COLORS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F1E6A8" />}
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F1E6A8" />}>
         <BackButton navigation={navigation} />
-
         <View style={styles.header}>
-          <View style={styles.headerIcon}>
-            <MaterialCommunityIcons name="credit-card-outline" size={34} color="#F1E6A8" />
-          </View>
+          <View style={styles.headerIcon}><MaterialCommunityIcons name="credit-card-outline" size={34} color="#F1E6A8" /></View>
           <Text style={styles.title}>Pagamentos</Text>
           <Text style={styles.subtitle}>Acompanhe cobranças, cartões e a futura área de cadastro.</Text>
         </View>
 
         <View style={styles.summaryRow}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Pagos</Text>
-            <Text style={styles.summaryValue}>{summary.paidCount}</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Total confirmado</Text>
-            <Text style={styles.summaryValueSmall}>{formatCurrency(summary.totalPaid)}</Text>
-          </View>
+          <View style={styles.summaryCard}><Text style={styles.summaryLabel}>Pagos</Text><Text style={styles.summaryValue}>{summary.paidCount}</Text></View>
+          <View style={styles.summaryCard}><Text style={styles.summaryLabel}>Total confirmado</Text><Text style={styles.summaryValueSmall}>{formatCurrency(summary.totalPaid)}</Text></View>
         </View>
 
         <View style={styles.panel}>
-          <View style={styles.tabs}>
-            {TABS.map((tab) => (
-              <TabButton key={tab.key} tab={tab} active={tab.key === activeTab} onPress={() => setActiveTab(tab.key)} />
-            ))}
-          </View>
-
+          <View style={styles.tabs}>{TABS.map((tab) => <TabButton key={tab.key} tab={tab} active={tab.key === activeTab} onPress={() => setActiveTab(tab.key)} />)}</View>
           <View style={styles.tabContent}>
             {activeTab === "history" && <PaymentHistory payments={payments} loading={loading} error={error} />}
             {activeTab === "cards" && <CardsList cards={cards} loading={loading} error={error} onAddCard={() => setActiveTab("add-card")} />}
@@ -271,106 +240,31 @@ export default function PaymentsScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG },
-  scrollContent: {
-    paddingTop: TOP_SPACING,
-    paddingHorizontal: 16,
-    paddingBottom: 34,
-  },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    alignSelf: "flex-start",
-    paddingVertical: 10,
-  },
+  scrollContent: { paddingTop: TOP_SPACING, paddingHorizontal: 16, paddingBottom: 34 },
+  backButton: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start", paddingVertical: 10 },
   backText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
   header: { alignItems: "center", paddingTop: 8, paddingBottom: 18 },
-  headerIcon: {
-    width: 68,
-    height: 68,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(241,230,168,0.24)",
-  },
+  headerIcon: { width: 68, height: 68, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 1, borderColor: "rgba(241,230,168,0.24)" },
   title: { color: "#FFFFFF", fontSize: 28, fontWeight: "900", marginTop: 14 },
-  subtitle: {
-    color: "rgba(255,255,255,0.74)",
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
-    marginTop: 8,
-    maxWidth: 320,
-  },
+  subtitle: { color: "rgba(255,255,255,0.74)", fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: 8, maxWidth: 320 },
   summaryRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
-  summaryCard: {
-    flex: 1,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    padding: 14,
-  },
+  summaryCard: { flex: 1, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", padding: 14 },
   summaryLabel: { color: "rgba(255,255,255,0.72)", fontSize: 12, fontWeight: "800" },
   summaryValue: { color: "#F1E6A8", fontSize: 28, fontWeight: "900", marginTop: 4 },
   summaryValueSmall: { color: "#F1E6A8", fontSize: 19, fontWeight: "900", marginTop: 8 },
-  panel: {
-    borderRadius: 28,
-    backgroundColor: "rgba(247,250,245,0.90)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.24)",
-    padding: 14,
-  },
-  tabs: {
-    flexDirection: "row",
-    gap: 8,
-    backgroundColor: "rgba(12,106,61,0.08)",
-    borderRadius: 18,
-    padding: 5,
-  },
-  tabButton: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-  },
+  panel: { borderRadius: 28, backgroundColor: "rgba(247,250,245,0.90)", borderWidth: 1, borderColor: "rgba(255,255,255,0.24)", padding: 14 },
+  tabs: { flexDirection: "row", gap: 8, backgroundColor: "rgba(12,106,61,0.08)", borderRadius: 18, padding: 5 },
+  tabButton: { flex: 1, minHeight: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", gap: 3 },
   tabButtonActive: { backgroundColor: "#0C6A3D" },
   tabText: { color: "rgba(18,61,42,0.68)", fontSize: 11, fontWeight: "900" },
   tabTextActive: { color: "#F1E6A8" },
   tabContent: { paddingTop: 16 },
   loader: { marginVertical: 28 },
-  emptyState: {
-    borderRadius: 20,
-    backgroundColor: "rgba(12,106,61,0.08)",
-    alignItems: "center",
-    padding: 24,
-  },
+  emptyState: { borderRadius: 20, backgroundColor: "rgba(12,106,61,0.08)", alignItems: "center", padding: 24 },
   emptyTitle: { color: "#123D2A", fontSize: 17, fontWeight: "900", marginTop: 12, textAlign: "center" },
   emptyDescription: { color: "rgba(18,61,42,0.70)", fontSize: 14, lineHeight: 20, marginTop: 8, textAlign: "center" },
-  paymentCard: {
-    minHeight: 86,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.70)",
-    borderWidth: 1,
-    borderColor: "rgba(12,106,61,0.14)",
-    padding: 13,
-    marginBottom: 11,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  paymentIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
-    backgroundColor: "rgba(12,106,61,0.88)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  paymentCard: { minHeight: 86, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.70)", borderWidth: 1, borderColor: "rgba(12,106,61,0.14)", padding: 13, marginBottom: 11, flexDirection: "row", alignItems: "center", gap: 12 },
+  paymentIconWrap: { width: 46, height: 46, borderRadius: 16, backgroundColor: "rgba(12,106,61,0.88)", alignItems: "center", justifyContent: "center" },
   paymentInfo: { flex: 1 },
   paymentTitle: { color: "#123D2A", fontSize: 15, fontWeight: "900" },
   paymentDate: { color: "rgba(18,61,42,0.60)", fontSize: 12, fontWeight: "700", marginTop: 4 },
@@ -382,63 +276,19 @@ const styles = StyleSheet.create({
   statusFailed: { backgroundColor: "rgba(183,46,46,0.14)" },
   statusNeutral: { backgroundColor: "rgba(18,61,42,0.10)" },
   statusText: { color: "#123D2A", fontSize: 11, fontWeight: "900" },
-  cardItem: {
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.70)",
-    borderWidth: 1,
-    borderColor: "rgba(12,106,61,0.14)",
-    padding: 14,
-    marginBottom: 11,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  cardBrandIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: "rgba(12,106,61,0.88)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  cardItem: { borderRadius: 18, backgroundColor: "rgba(255,255,255,0.70)", borderWidth: 1, borderColor: "rgba(12,106,61,0.14)", padding: 14, marginBottom: 11, flexDirection: "row", alignItems: "center", gap: 12 },
+  cardBrandIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: "rgba(12,106,61,0.88)", alignItems: "center", justifyContent: "center" },
   cardInfo: { flex: 1 },
   cardTitle: { color: "#123D2A", fontSize: 15, fontWeight: "900" },
   cardSubtitle: { color: "rgba(18,61,42,0.62)", fontSize: 12, fontWeight: "700", marginTop: 4 },
   defaultPill: { borderRadius: 999, backgroundColor: "rgba(12,106,61,0.12)", paddingHorizontal: 9, paddingVertical: 5 },
   defaultPillText: { color: "#0C6A3D", fontSize: 11, fontWeight: "900" },
-  primaryAction: {
-    marginTop: 12,
-    minHeight: 48,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#0C6A3D",
-  },
+  primaryAction: { marginTop: 12, minHeight: 48, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: "#0C6A3D" },
   primaryActionText: { color: "#F1E6A8", fontSize: 14, fontWeight: "900" },
-  addCardBox: {
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.70)",
-    borderWidth: 1,
-    borderColor: "rgba(12,106,61,0.14)",
-    padding: 22,
-    alignItems: "center",
-  },
-  addCardIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
-    backgroundColor: "rgba(12,106,61,0.90)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  addCardBox: { borderRadius: 22, backgroundColor: "rgba(255,255,255,0.70)", borderWidth: 1, borderColor: "rgba(12,106,61,0.14)", padding: 22, alignItems: "center" },
+  addCardIcon: { width: 72, height: 72, borderRadius: 24, backgroundColor: "rgba(12,106,61,0.90)", alignItems: "center", justifyContent: "center" },
   addCardTitle: { color: "#123D2A", fontSize: 20, fontWeight: "900", marginTop: 16, textAlign: "center" },
   addCardText: { color: "rgba(18,61,42,0.72)", fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: "center" },
-  disabledAction: {
-    marginTop: 18,
-    borderRadius: 16,
-    paddingVertical: 13,
-    paddingHorizontal: 18,
-    backgroundColor: "rgba(18,61,42,0.12)",
-  },
+  disabledAction: { marginTop: 18, borderRadius: 16, paddingVertical: 13, paddingHorizontal: 18, backgroundColor: "rgba(18,61,42,0.12)" },
   disabledActionText: { color: "rgba(18,61,42,0.62)", fontSize: 14, fontWeight: "900" },
 });
