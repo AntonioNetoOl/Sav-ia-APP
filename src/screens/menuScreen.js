@@ -68,7 +68,7 @@ function MenuCard({ label, icon, iconLib = "ion", onPress }) {
       style={({ pressed }) => [styles.menuCard, pressed && styles.menuCardPressed]}
     >
       <View style={styles.menuIconWrap}>
-        <IconComponent name={icon} size={31} color="#F1E6A8" />
+        <IconComponent name={icon} size={31} color="rgba(241,230,168,0.78)" />
       </View>
       <Text style={styles.menuCardLabel}>{label}</Text>
     </Pressable>
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     minHeight: 520,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    backgroundColor: "#F7FAF5",
+    backgroundColor: "rgba(247,250,245,0.88)",
     paddingHorizontal: PANEL_PADDING,
     paddingTop: 28,
     paddingBottom: 30,
@@ -307,9 +307,9 @@ const styles = StyleSheet.create({
     width: GRID_CARD_WIDTH,
     minHeight: 112,
     borderRadius: 16,
-    backgroundColor: "rgba(7,83,51,0.90)",
+    backgroundColor: "rgba(7,83,51,0.80)",
     borderWidth: 1,
-    borderColor: "rgba(12,106,61,0.34)",
+    borderColor: "rgba(12,106,61,0.26)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 8,
@@ -325,11 +325,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.10)",
     marginBottom: 9,
   },
   menuCardLabel: {
-    color: "#FFFFFF",
+    color: "rgba(255,255,255,0.92)",
     fontSize: 14,
     fontWeight: "800",
     lineHeight: 18,
@@ -344,9 +344,9 @@ const styles = StyleSheet.create({
     marginTop: 24,
     borderRadius: 18,
     padding: 14,
-    backgroundColor: "#EDF5ED",
+    backgroundColor: "rgba(237,245,237,0.76)",
     borderWidth: 1,
-    borderColor: "rgba(12,106,61,0.20)",
+    borderColor: "rgba(12,106,61,0.18)",
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(12,106,61,0.10)",
+    backgroundColor: "rgba(12,106,61,0.08)",
   },
   ratingTextBlock: {
     flex: 1,
