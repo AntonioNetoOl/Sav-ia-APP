@@ -19,6 +19,7 @@ import LoyaltyInfoScreen from "../screens/loyaltyInfoScreen";
 import MenuScreen from "../screens/menuScreen";
 import PaymentsScreen from "../screens/paymentsScreen";
 import ProfileScreen from "../screens/profileScreen";
+import SocioScreen from "../screens/socioScreen";
 import SubsedesScreen from "../screens/subsedesScreen";
 
 const Stack = createNativeStackNavigator();
@@ -88,6 +89,7 @@ export default function AppNavigator() {
           <Stack.Screen name="ForgotReset" component={ForgotResetScreen} options={{ headerShown: false, ...modalLike }} />
           <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false, animation: "fade_from_bottom" }} />
           <Stack.Screen name="Menu" component={MenuScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Socio" component={SocioScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Subsedes" component={SubsedesScreen} options={{ headerShown: false }} />
           <Stack.Screen name="LoyaltyInfo" component={LoyaltyInfoScreen} options={{ headerShown: false }} />
