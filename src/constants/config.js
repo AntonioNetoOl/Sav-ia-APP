@@ -20,4 +20,5 @@ export const API_PATHS = {
   mePayments: "/api/me/payments",
   mePaymentCards: "/api/me/payment-cards",
   meBenefits: "/api/me/benefits",
+  memberSummary: "/api/member/summary",
 };

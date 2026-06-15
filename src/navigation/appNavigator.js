@@ -1,9 +1,13 @@
 // src/navigation/appNavigator.js
-import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
+import {
+  DefaultTheme,
+  NavigationContainer,
+  createNavigationContainerRef,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SystemUI from "expo-system-ui";
 import { useEffect } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Alert, Platform, Pressable, Text, View } from "react-native";
 
 import CadastroScreen from "../screens/cadastroScreen";
 import HomeScreen from "../screens/homeScreen";
@@ -19,12 +23,36 @@ import LoyaltyInfoScreen from "../screens/loyaltyInfoScreen";
 import MenuScreen from "../screens/menuScreen";
 import PaymentsScreen from "../screens/paymentsScreen";
 import ProfileScreen from "../screens/profileScreen";
+import SocioScreen from "../screens/socioScreen";
 import SubsedesScreen from "../screens/subsedesScreen";
 
 const Stack = createNativeStackNavigator();
+const navigationRef = createNavigationContainerRef();
+let originalAlert = null;
 
 export const STACK_BG = "#05271A";
 const IS_ANDROID = Platform.OS === "android";
+
+function installLegacySocioAlertBridge() {
+  if (originalAlert) return;
+
+  originalAlert = Alert.alert;
+
+  Alert.alert = (title, message, ...rest) => {
+    const normalizedTitle = String(title || "");
+    const normalizedMessage = String(message || "");
+    const isLegacySocioAlert =
+      (normalizedTitle === "Sócio" || normalizedTitle === "Área do Sócio") &&
+      normalizedMessage.includes("aba Sócio");
+
+    if (isLegacySocioAlert && navigationRef.isReady()) {
+      navigationRef.navigate("Socio");
+      return;
+    }
+
+    return originalAlert(title, message, ...rest);
+  };
+}
 
 function PlaceholderScreen({ navigation, route }) {
   const title = route?.params?.title || "Área em desenvolvimento";
@@ -62,12 +90,14 @@ const modalLike = Platform.select({
 
 export default function AppNavigator() {
   useEffect(() => {
+    installLegacySocioAlertBridge();
+
     if (IS_ANDROID) SystemUI.setBackgroundColorAsync(STACK_BG).catch(() => {});
   }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: STACK_BG }}>
-      <NavigationContainer theme={SavTheme}>
+      <NavigationContainer ref={navigationRef} theme={SavTheme}>
         <Stack.Navigator
           initialRouteName="Splash"
           screenOptions={{
@@ -88,6 +118,7 @@ export default function AppNavigator() {
           <Stack.Screen name="ForgotReset" component={ForgotResetScreen} options={{ headerShown: false, ...modalLike }} />
           <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false, animation: "fade_from_bottom" }} />
           <Stack.Screen name="Menu" component={MenuScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Socio" component={SocioScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Subsedes" component={SubsedesScreen} options={{ headerShown: false }} />
           <Stack.Screen name="LoyaltyInfo" component={LoyaltyInfoScreen} options={{ headerShown: false }} />

@@ -164,7 +164,7 @@ export default function MenuScreen({ navigation }) {
           <View style={styles.divider} />
 
           <MenuSection title="Seção Sócio">
-            <MenuCard label="Minha associação" icon="shield-star-outline" iconLib="mci" onPress={() => Alert.alert("Sócio", "A aba Sócio será implementada na próxima etapa.")} />
+            <MenuCard label="Minha associação" icon="shield-star-outline" iconLib="mci" onPress={() => navigation.navigate("Socio")} />
             <MenuCard label="Como funciona a fidelidade" icon="gift-outline" iconLib="mci" onPress={() => navigation.navigate("LoyaltyInfo")} />
             <MenuCard label="Meus benefícios" icon="ticket-percent-outline" iconLib="mci" onPress={() => navigation.navigate("Benefits")} />
           </MenuSection>
