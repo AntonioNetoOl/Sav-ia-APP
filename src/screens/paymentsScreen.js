@@ -2,18 +2,7 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
 
 import { getMePaymentCards, getMePayments } from "../api/menuClient";
 
@@ -42,8 +31,13 @@ function formatDate(dateString) {
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function isScheduledPayment(payment) {
+  return String(payment?.status || "").toLowerCase() === "scheduled" || Boolean(payment?.scheduledAt);
+}
+
 function getPaymentStatus(status) {
   const normalized = String(status || "").toLowerCase();
+  if (normalized === "scheduled") return { label: "Agendado", style: styles.statusScheduled };
   if (["confirmed", "paid", "pago", "confirmado"].includes(normalized)) return { label: "Pago", style: styles.statusPaid };
   if (["pending", "pendente"].includes(normalized)) return { label: "Pendente", style: styles.statusPending };
   if (["failed", "recused", "recusado", "falhou"].includes(normalized)) return { label: "Falhou", style: styles.statusFailed };
@@ -58,7 +52,7 @@ function getCardExpiration(card) {
 
 function BackButton({ navigation }) {
   return (
-    <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.72 }]}>
+    <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.72 }]}> 
       <Ionicons name="arrow-back" size={21} color="#FFFFFF" />
       <Text style={styles.backText}>Voltar</Text>
     </Pressable>
@@ -68,7 +62,7 @@ function BackButton({ navigation }) {
 function TabButton({ tab, active, onPress }) {
   const IconComponent = tab.iconLib === "mci" ? MaterialCommunityIcons : Ionicons;
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.tabButton, active && styles.tabButtonActive, pressed && { opacity: 0.82 }]}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.tabButton, active && styles.tabButtonActive, pressed && { opacity: 0.82 }]}> 
       <IconComponent name={tab.icon} size={18} color={active ? "#F1E6A8" : "rgba(18,61,42,0.62)"} />
       <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
     </Pressable>
@@ -85,34 +79,60 @@ function EmptyState({ icon, title, description }) {
   );
 }
 
+function PaymentRow({ payment, scheduled = false }) {
+  const status = getPaymentStatus(payment.status);
+  const title = payment.title || payment.description || "Pagamento Savóia";
+  const dateText = scheduled
+    ? `Cobrança programada para ${formatDate(payment.scheduledAt)}`
+    : payment.paidAt
+      ? `Pago em ${formatDate(payment.paidAt)}`
+      : formatDate(payment.paidAt);
+  const subtitle = [payment.competenceLabel, dateText, payment.methodLabel].filter(Boolean).join(" · ");
+
+  return (
+    <View style={[styles.paymentCard, scheduled && styles.scheduledCard]}>
+      <View style={[styles.paymentIconWrap, scheduled && styles.scheduledIconWrap]}>
+        <Ionicons name={scheduled ? "calendar-outline" : "receipt-outline"} size={24} color="#F1E6A8" />
+      </View>
+      <View style={styles.paymentInfo}>
+        <Text style={styles.paymentTitle}>{title}</Text>
+        <Text style={styles.paymentDate}>{subtitle}</Text>
+      </View>
+      <View style={styles.paymentRight}>
+        <Text style={styles.paymentAmount}>{formatCurrency(payment.amount)}</Text>
+        <View style={[styles.statusPill, status.style]}>
+          <Text style={styles.statusText}>{status.label}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function PaymentHistory({ payments, loading, error }) {
   if (loading) return <ActivityIndicator color="#0C6A3D" style={styles.loader} />;
   if (error) return <EmptyState icon="warning-outline" title="Não foi possível carregar" description="Tente novamente em alguns instantes." />;
   if (!payments.length) return <EmptyState icon="receipt-outline" title="Nenhum pagamento encontrado" description="Quando houver mensalidades ou cobranças, elas aparecerão aqui." />;
 
-  return payments.map((payment) => {
-    const status = getPaymentStatus(payment.status);
-    const dateText = payment.paidAt ? `Pago em ${formatDate(payment.paidAt)}` : formatDate(payment.paidAt);
-    const subtitle = [payment.competenceLabel, dateText, payment.methodLabel].filter(Boolean).join(" · ");
+  const scheduledPayments = payments.filter(isScheduledPayment);
+  const historyPayments = payments.filter((payment) => !isScheduledPayment(payment));
 
-    return (
-      <View key={payment.id} style={styles.paymentCard}>
-        <View style={styles.paymentIconWrap}>
-          <Ionicons name="receipt-outline" size={24} color="#F1E6A8" />
+  return (
+    <View>
+      {scheduledPayments.length > 0 && (
+        <View style={styles.paymentsSection}>
+          <Text style={styles.paymentsSectionTitle}>Próximos lançamentos</Text>
+          {scheduledPayments.map((payment) => <PaymentRow key={payment.id} payment={payment} scheduled />)}
         </View>
-        <View style={styles.paymentInfo}>
-          <Text style={styles.paymentTitle}>{payment.title || payment.description || "Pagamento Savóia"}</Text>
-          <Text style={styles.paymentDate}>{subtitle}</Text>
-        </View>
-        <View style={styles.paymentRight}>
-          <Text style={styles.paymentAmount}>{formatCurrency(payment.amount)}</Text>
-          <View style={[styles.statusPill, status.style]}>
-            <Text style={styles.statusText}>{status.label}</Text>
-          </View>
-        </View>
+      )}
+
+      <View style={styles.paymentsSection}>
+        <Text style={styles.paymentsSectionTitle}>Histórico de pagamentos</Text>
+        {historyPayments.length > 0
+          ? historyPayments.map((payment) => <PaymentRow key={payment.id} payment={payment} />)
+          : <EmptyState icon="receipt-outline" title="Sem histórico" description="Os pagamentos confirmados ou pendentes aparecerão aqui." />}
       </View>
-    );
-  });
+    </View>
+  );
 }
 
 function CardsList({ cards, loading, error, onAddCard }) {
@@ -121,8 +141,8 @@ function CardsList({ cards, loading, error, onAddCard }) {
   if (!cards.length) {
     return (
       <View>
-        <EmptyState icon="card-outline" title="Nenhum cartão cadastrado" description="O cadastro de cartão será liberado com a integração do gateway de pagamento." />
-        <Pressable onPress={onAddCard} style={({ pressed }) => [styles.primaryAction, pressed && { opacity: 0.84 }]}>
+        <EmptyState icon="card-outline" title="Nenhum cartão cadastrado" description="O cadastro de cartão será liberado com a integração financeira." />
+        <Pressable onPress={onAddCard} style={({ pressed }) => [styles.primaryAction, pressed && { opacity: 0.84 }]}> 
           <Text style={styles.primaryActionText}>Cadastrar cartão</Text>
         </Pressable>
       </View>
@@ -148,7 +168,7 @@ function CardsList({ cards, loading, error, onAddCard }) {
         </View>
       ))}
 
-      <Pressable onPress={onAddCard} style={({ pressed }) => [styles.primaryAction, pressed && { opacity: 0.84 }]}>
+      <Pressable onPress={onAddCard} style={({ pressed }) => [styles.primaryAction, pressed && { opacity: 0.84 }]}> 
         <Text style={styles.primaryActionText}>Cadastrar novo cartão</Text>
       </Pressable>
     </View>
@@ -162,11 +182,11 @@ function AddCardPlaceholder({ onBackToCards }) {
         <MaterialCommunityIcons name="credit-card-plus-outline" size={38} color="#F1E6A8" />
       </View>
       <Text style={styles.addCardTitle}>Cadastro de cartão em preparação</Text>
-      <Text style={styles.addCardText}>Esta área está reservada para a futura integração com gateway de pagamento. Por segurança, o app ainda não coleta número de cartão, CVV ou dados sensíveis nesta versão.</Text>
-      <Pressable onPress={() => Alert.alert("Em breve", "O cadastro de cartão será liberado após a integração financeira.")} style={({ pressed }) => [styles.disabledAction, pressed && { opacity: 0.84 }]}>
+      <Text style={styles.addCardText}>Esta área está reservada para a futura integração financeira. A versão atual ainda não coleta dados protegidos de pagamento.</Text>
+      <Pressable onPress={() => Alert.alert("Em breve", "O cadastro de cartão será liberado após a integração financeira.")} style={({ pressed }) => [styles.disabledAction, pressed && { opacity: 0.84 }]}> 
         <Text style={styles.disabledActionText}>Disponível em breve</Text>
       </Pressable>
-      <Pressable onPress={onBackToCards} style={({ pressed }) => [styles.secondaryAction, pressed && { opacity: 0.84 }]}>
+      <Pressable onPress={onBackToCards} style={({ pressed }) => [styles.secondaryAction, pressed && { opacity: 0.84 }]}> 
         <Text style={styles.secondaryActionText}>Voltar para cartões</Text>
       </Pressable>
     </View>
@@ -219,7 +239,7 @@ export default function PaymentsScreen({ navigation, route }) {
         <View style={styles.header}>
           <View style={styles.headerIcon}><MaterialCommunityIcons name="credit-card-outline" size={34} color="#F1E6A8" /></View>
           <Text style={styles.title}>Pagamentos</Text>
-          <Text style={styles.subtitle}>Acompanhe seu histórico e seus cartões cadastrados.</Text>
+          <Text style={styles.subtitle}>Acompanhe seu histórico, próximos lançamentos e cartões cadastrados.</Text>
         </View>
 
         <View style={styles.summaryRow}>
@@ -228,9 +248,7 @@ export default function PaymentsScreen({ navigation, route }) {
         </View>
 
         <View style={styles.panel}>
-          {activeTab !== "add-card" && (
-            <View style={styles.tabs}>{TABS.map((tab) => <TabButton key={tab.key} tab={tab} active={tab.key === activeTab} onPress={() => setActiveTab(tab.key)} />)}</View>
-          )}
+          {activeTab !== "add-card" && <View style={styles.tabs}>{TABS.map((tab) => <TabButton key={tab.key} tab={tab} active={tab.key === activeTab} onPress={() => setActiveTab(tab.key)} />)}</View>}
           <View style={styles.tabContent}>
             {activeTab === "history" && <PaymentHistory payments={payments} loading={loading} error={error} />}
             {activeTab === "cards" && <CardsList cards={cards} loading={loading} error={error} onAddCard={() => setActiveTab("add-card")} />}
@@ -250,7 +268,7 @@ const styles = StyleSheet.create({
   header: { alignItems: "center", paddingTop: 8, paddingBottom: 18 },
   headerIcon: { width: 68, height: 68, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 1, borderColor: "rgba(241,230,168,0.24)" },
   title: { color: "#FFFFFF", fontSize: 28, fontWeight: "900", marginTop: 14 },
-  subtitle: { color: "rgba(255,255,255,0.74)", fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: 8, maxWidth: 320 },
+  subtitle: { color: "rgba(255,255,255,0.74)", fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: 8, maxWidth: 340 },
   summaryRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
   summaryCard: { flex: 1, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", padding: 14 },
   summaryLabel: { color: "rgba(255,255,255,0.72)", fontSize: 12, fontWeight: "800" },
@@ -267,8 +285,12 @@ const styles = StyleSheet.create({
   emptyState: { borderRadius: 20, backgroundColor: "rgba(12,106,61,0.08)", alignItems: "center", padding: 24 },
   emptyTitle: { color: "#123D2A", fontSize: 17, fontWeight: "900", marginTop: 12, textAlign: "center" },
   emptyDescription: { color: "rgba(18,61,42,0.70)", fontSize: 14, lineHeight: 20, marginTop: 8, textAlign: "center" },
+  paymentsSection: { marginBottom: 14 },
+  paymentsSectionTitle: { color: "#123D2A", fontSize: 16, fontWeight: "900", marginBottom: 10 },
   paymentCard: { minHeight: 86, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.70)", borderWidth: 1, borderColor: "rgba(12,106,61,0.14)", padding: 13, marginBottom: 11, flexDirection: "row", alignItems: "center", gap: 12 },
+  scheduledCard: { backgroundColor: "rgba(241,230,168,0.22)", borderColor: "rgba(181,132,22,0.20)" },
   paymentIconWrap: { width: 46, height: 46, borderRadius: 16, backgroundColor: "rgba(12,106,61,0.88)", alignItems: "center", justifyContent: "center" },
+  scheduledIconWrap: { backgroundColor: "rgba(181,132,22,0.80)" },
   paymentInfo: { flex: 1 },
   paymentTitle: { color: "#123D2A", fontSize: 15, fontWeight: "900" },
   paymentDate: { color: "rgba(18,61,42,0.60)", fontSize: 12, fontWeight: "700", marginTop: 4 },
@@ -277,6 +299,7 @@ const styles = StyleSheet.create({
   statusPill: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
   statusPaid: { backgroundColor: "rgba(12,106,61,0.14)" },
   statusPending: { backgroundColor: "rgba(181,132,22,0.16)" },
+  statusScheduled: { backgroundColor: "rgba(181,132,22,0.20)" },
   statusFailed: { backgroundColor: "rgba(183,46,46,0.14)" },
   statusNeutral: { backgroundColor: "rgba(18,61,42,0.10)" },
   statusText: { color: "#123D2A", fontSize: 11, fontWeight: "900" },
