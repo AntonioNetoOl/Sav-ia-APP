@@ -18,7 +18,6 @@ import {
 
 import { getMe } from "../api/menuClient";
 import BottomNavigation from "../components/bottomNavigation";
-import GlassCard from "../components/glassCard";
 import { EXTERNAL_LINKS } from "../constants/externalLinks";
 import { removeToken } from "../utils/storage";
 
@@ -30,9 +29,10 @@ const TOP_LOGO_SRC = require("../../assets/savoia-cruz.png");
 const WATERMARK_SRC = require("../../assets/Logo-savoia.png");
 
 const TOP_SPACING = Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 24;
-const CARD_WIDTH = Math.min(width - 20, 980);
+const CARD_WIDTH = width;
+const PANEL_PADDING = 18;
 const GRID_GAP = 12;
-const GRID_CARD_WIDTH = Math.floor((CARD_WIDTH - 18 * 2 - GRID_GAP) / 2);
+const GRID_CARD_WIDTH = Math.floor((CARD_WIDTH - PANEL_PADDING * 2 - GRID_GAP) / 2);
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -153,7 +153,7 @@ export default function MenuScreen({ navigation }) {
           <Text style={styles.description}>Acesse sua conta, benefícios, pagamentos, sedes e suporte.</Text>
         </View>
 
-        <GlassCard width={CARD_WIDTH} radius={26} padding={18} blur={Platform.OS === "ios"} androidBlurMode="fallback" androidElevation={0} scrimOpacityAndroid={0.15} scrimOpacityIOS={0.07} scrimOpacityWeb={0.1}>
+        <View style={styles.menuPanel}>
           <MenuSection title="Sede social">
             <MenuCard label="Sede" icon="location-outline" onPress={() => openUrl(EXTERNAL_LINKS.sedeMapsUrl, "Sede social")} />
             <MenuCard label="Subsedes" icon="map-marker-multiple-outline" iconLib="mci" onPress={() => navigation.navigate("Subsedes")} />
@@ -190,7 +190,7 @@ export default function MenuScreen({ navigation }) {
 
           <View style={styles.ratingCard}>
             <View style={styles.ratingIconWrap}>
-              <Ionicons name="star-outline" size={24} color="#F1E6A8" />
+              <Ionicons name="star-outline" size={24} color="#0B5A38" />
             </View>
             <View style={styles.ratingTextBlock}>
               <Text style={styles.ratingTitle}>Gostando do app?</Text>
@@ -202,12 +202,12 @@ export default function MenuScreen({ navigation }) {
           </View>
 
           <Pressable onPress={handleLogout} style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.76 }]}>
-            <Ionicons name="log-out-outline" size={20} color="#FF8C8C" />
+            <Ionicons name="log-out-outline" size={20} color="#B72E2E" />
             <Text style={styles.logoutText}>Sair da conta</Text>
           </Pressable>
 
           <Text style={styles.versionText}>Versão 1.0.0</Text>
-        </GlassCard>
+        </View>
       </ScrollView>
 
       <BottomNavigation activeKey="menu" navigation={navigation} />
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: TOP_SPACING,
-    paddingHorizontal: 10,
+    paddingHorizontal: 0,
     paddingBottom: 124,
     alignItems: "center",
   },
@@ -239,6 +239,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 6,
     paddingBottom: 18,
+    paddingHorizontal: 18,
   },
   logo: {
     width: 96,
@@ -260,9 +261,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "rgba(10,10,10,0.62)",
+    backgroundColor: "#0C6A3D",
     borderWidth: 1,
-    borderColor: "rgba(241,230,168,0.22)",
+    borderColor: "rgba(241,230,168,0.48)",
   },
   profileButtonText: {
     color: "#F1E6A8",
@@ -277,13 +278,23 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: "center",
   },
+  menuPanel: {
+    width: CARD_WIDTH,
+    minHeight: 520,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: "#F7FAF5",
+    paddingHorizontal: PANEL_PADDING,
+    paddingTop: 28,
+    paddingBottom: 30,
+  },
   section: {
     marginBottom: 2,
   },
   sectionTitle: {
-    color: "rgba(255,255,255,0.82)",
+    color: "#123D2A",
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "900",
     textAlign: "center",
     marginBottom: 14,
   },
@@ -296,9 +307,9 @@ const styles = StyleSheet.create({
     width: GRID_CARD_WIDTH,
     minHeight: 112,
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.30)",
+    backgroundColor: "rgba(7,83,51,0.90)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(12,106,61,0.34)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 8,
@@ -314,11 +325,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.14)",
     marginBottom: 9,
   },
   menuCardLabel: {
-    color: "rgba(255,255,255,0.88)",
+    color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "800",
     lineHeight: 18,
@@ -326,16 +337,16 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "rgba(255,255,255,0.09)",
+    backgroundColor: "rgba(18,61,42,0.14)",
     marginVertical: 24,
   },
   ratingCard: {
     marginTop: 24,
     borderRadius: 18,
     padding: 14,
-    backgroundColor: "rgba(213,193,107,0.10)",
+    backgroundColor: "#EDF5ED",
     borderWidth: 1,
-    borderColor: "rgba(213,193,107,0.22)",
+    borderColor: "rgba(12,106,61,0.20)",
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -346,18 +357,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(12,106,61,0.10)",
   },
   ratingTextBlock: {
     flex: 1,
   },
   ratingTitle: {
-    color: "#FFFFFF",
+    color: "#123D2A",
     fontSize: 15,
     fontWeight: "900",
   },
   ratingText: {
-    color: "rgba(255,255,255,0.72)",
+    color: "rgba(18,61,42,0.72)",
     fontSize: 12,
     lineHeight: 16,
     marginTop: 3,
@@ -366,9 +377,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "rgba(0,0,0,0.28)",
+    backgroundColor: "#0C6A3D",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(12,106,61,0.20)",
   },
   ratingButtonText: {
     color: "#F1E6A8",
@@ -383,18 +394,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "rgba(255,80,80,0.08)",
+    backgroundColor: "rgba(183,46,46,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(255,120,120,0.16)",
+    borderColor: "rgba(183,46,46,0.16)",
   },
   logoutText: {
-    color: "#FF8C8C",
+    color: "#B72E2E",
     fontSize: 14,
     fontWeight: "900",
   },
   versionText: {
     marginTop: 14,
-    color: "rgba(255,255,255,0.44)",
+    color: "rgba(18,61,42,0.46)",
     fontSize: 12,
     textAlign: "center",
   },
