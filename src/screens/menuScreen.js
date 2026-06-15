@@ -28,14 +28,11 @@ const GRADIENT_COLORS = ["#083726", "#072F20", "#05271A"];
 const TOP_LOGO_SRC = require("../../assets/savoia-cruz.png");
 const WATERMARK_SRC = require("../../assets/Logo-savoia.png");
 
-const TOP_SPACING =
-  Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 24;
+const TOP_SPACING = Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 24;
 const CARD_WIDTH = width;
 const PANEL_PADDING = 18;
 const GRID_GAP = 12;
-const GRID_CARD_WIDTH = Math.floor(
-  (CARD_WIDTH - PANEL_PADDING * 2 - GRID_GAP) / 2,
-);
+const GRID_CARD_WIDTH = Math.floor((CARD_WIDTH - PANEL_PADDING * 2 - GRID_GAP) / 2);
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -62,7 +59,7 @@ async function openUrl(url, fallbackTitle = "Link indisponível") {
   }
 }
 
-function MenuCard({ label, icon, iconLib = "ion", onPress }) {
+function MenuCard({ label, icon, iconLib = "ion", onPress, wide = false }) {
   const IconComponent = iconLib === "mci" ? MaterialCommunityIcons : Ionicons;
 
   return (
@@ -70,6 +67,7 @@ function MenuCard({ label, icon, iconLib = "ion", onPress }) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.menuCard,
+        wide && styles.menuCardWide,
         pressed && styles.menuCardPressed,
       ]}
     >
@@ -101,9 +99,7 @@ export default function MenuScreen({ navigation }) {
         if (mounted) setUser(data);
       })
       .catch(() => {
-        if (mounted) {
-          setUser({ name: "torcedor", memberStatus: "nao_socio" });
-        }
+        if (mounted) setUser({ name: "torcedor", memberStatus: "nao_socio" });
       });
 
     return () => {
@@ -129,165 +125,73 @@ export default function MenuScreen({ navigation }) {
 
   const handleSupportEmail = () => {
     if (!EXTERNAL_LINKS.supportEmail) {
-      Alert.alert(
-        "Atendimento",
-        "O e-mail oficial de atendimento será configurado em breve.",
-      );
+      Alert.alert("Atendimento", "O e-mail oficial de atendimento será configurado em breve.");
       return;
     }
 
     const subject = encodeURIComponent("Atendimento APP Savóia");
-    openUrl(
-      `mailto:${EXTERNAL_LINKS.supportEmail}?subject=${subject}`,
-      "Atendimento",
-    );
+    openUrl(`mailto:${EXTERNAL_LINKS.supportEmail}?subject=${subject}`, "Atendimento");
   };
 
   const handleRateApp = () => {
-    const url =
-      Platform.OS === "ios"
-        ? EXTERNAL_LINKS.appStoreUrl
-        : EXTERNAL_LINKS.googlePlayUrl;
+    const url = Platform.OS === "ios" ? EXTERNAL_LINKS.appStoreUrl : EXTERNAL_LINKS.googlePlayUrl;
     openUrl(url, "Avaliação do app");
   };
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={SCREEN_BG} />
-      <LinearGradient
-        colors={GRADIENT_COLORS}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      <Image
-        source={WATERMARK_SRC}
-        resizeMode="contain"
-        style={styles.watermark}
-        fadeDuration={0}
-      />
+      <LinearGradient colors={GRADIENT_COLORS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      <Image source={WATERMARK_SRC} resizeMode="contain" style={styles.watermark} fadeDuration={0} />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        overScrollMode="never"
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} overScrollMode="never">
         <View style={styles.header}>
-          <Image
-            source={TOP_LOGO_SRC}
-            resizeMode="contain"
-            style={styles.logo}
-            fadeDuration={0}
-          />
-          <Text style={styles.greeting}>
-            {getGreeting()}, {displayName}
-          </Text>
-          <Pressable
-            onPress={() => navigation.navigate("Profile")}
-            style={({ pressed }) => [
-              styles.profileButton,
-              pressed && { opacity: 0.86 },
-            ]}
-          >
+          <Image source={TOP_LOGO_SRC} resizeMode="contain" style={styles.logo} fadeDuration={0} />
+          <Text style={styles.greeting}>{getGreeting()}, {displayName}</Text>
+          <Pressable onPress={() => navigation.navigate("Profile")} style={({ pressed }) => [styles.profileButton, pressed && { opacity: 0.86 }]}>
             <Ionicons name="person-outline" size={19} color="#F1E6A8" />
             <Text style={styles.profileButtonText}>Acessar meu perfil</Text>
           </Pressable>
-          <Text style={styles.description}>
-            Acesse sua conta, benefícios, pagamentos, sedes e suporte.
-          </Text>
+          <Text style={styles.description}>Acesse sua conta, benefícios, pagamentos, sedes e suporte.</Text>
         </View>
 
         <View style={styles.menuPanel}>
           <MenuSection title="Sede social">
-            <MenuCard
-              label="Sede"
-              icon="location-outline"
-              onPress={() => openUrl(EXTERNAL_LINKS.sedeMapsUrl, "Sede social")}
-            />
-            <MenuCard
-              label="Subsedes"
-              icon="map-marker-multiple-outline"
-              iconLib="mci"
-              onPress={() => navigation.navigate("Subsedes")}
-            />
+            <MenuCard label="Sede" icon="location-outline" onPress={() => openUrl(EXTERNAL_LINKS.sedeMapsUrl, "Sede social")} />
+            <MenuCard label="Subsedes" icon="map-marker-multiple-outline" iconLib="mci" onPress={() => navigation.navigate("Subsedes")} />
           </MenuSection>
 
           <View style={styles.divider} />
 
           <MenuSection title="Seção Sócio">
-            <MenuCard
-              label="Minha associação"
-              icon="shield-star-outline"
-              iconLib="mci"
-              onPress={() =>
-                Alert.alert(
-                  "Sócio",
-                  "A aba Sócio será implementada na próxima etapa.",
-                )
-              }
-            />
-            <MenuCard
-              label="Como funciona a fidelidade"
-              icon="gift-outline"
-              iconLib="mci"
-              onPress={() => navigation.navigate("LoyaltyInfo")}
-            />
-            <MenuCard
-              label="Meus benefícios"
-              icon="ticket-percent-outline"
-              iconLib="mci"
-              onPress={() => navigation.navigate("Benefits")}
-            />
+            <MenuCard label="Minha associação" icon="shield-star-outline" iconLib="mci" onPress={() => Alert.alert("Sócio", "A aba Sócio será implementada na próxima etapa.")} />
+            <MenuCard label="Como funciona a fidelidade" icon="gift-outline" iconLib="mci" onPress={() => navigation.navigate("LoyaltyInfo")} />
+            <MenuCard label="Meus benefícios" icon="ticket-percent-outline" iconLib="mci" onPress={() => navigation.navigate("Benefits")} />
           </MenuSection>
 
           <View style={styles.divider} />
 
           <MenuSection title="Pagamentos">
             <MenuCard
+              wide
               label="Histórico de pagamentos"
               icon="receipt-outline"
-              onPress={() =>
-                navigation.navigate("Payments", { initialTab: "history" })
-              }
-            />
-            <MenuCard
-              label="Cartões cadastrados"
-              icon="credit-card-outline"
-              iconLib="mci"
-              onPress={() =>
-                navigation.navigate("Payments", { initialTab: "cards" })
-              }
+              onPress={() => navigation.navigate("Payments", { initialTab: "history" })}
             />
           </MenuSection>
 
           <View style={styles.divider} />
 
           <MenuSection title="Ajuda">
-            <MenuCard
-              label="Falar com a Savóia"
-              icon="mail-outline"
-              onPress={handleSupportEmail}
-            />
-            <MenuCard
-              label="Dúvidas frequentes"
-              icon="help-circle-outline"
-              onPress={() => navigation.navigate("FAQ")}
-            />
+            <MenuCard label="Falar com a Savóia" icon="mail-outline" onPress={handleSupportEmail} />
+            <MenuCard label="Dúvidas frequentes" icon="help-circle-outline" onPress={() => navigation.navigate("FAQ")} />
           </MenuSection>
 
           <View style={styles.divider} />
 
           <MenuSection title="Conta">
-            <MenuCard
-              label="Configurações"
-              icon="settings-outline"
-              onPress={() => navigation.navigate("Settings")}
-            />
-            <MenuCard
-              label="Termos e\nprivacidade"
-              icon="document-text-outline"
-              onPress={() => navigation.navigate("TermsPrivacy")}
-            />
+            <MenuCard label="Configurações" icon="settings-outline" onPress={() => navigation.navigate("Settings")} />
+            <MenuCard label={"Termos e\nprivacidade"} icon="document-text-outline" onPress={() => navigation.navigate("TermsPrivacy")} />
           </MenuSection>
 
           <View style={styles.ratingCard}>
@@ -296,30 +200,14 @@ export default function MenuScreen({ navigation }) {
             </View>
             <View style={styles.ratingTextBlock}>
               <Text style={styles.ratingTitle}>Gostando do app?</Text>
-              <Text style={styles.ratingText}>
-                Avalie a Savóia e ajude a melhorar nossa experiência.
-              </Text>
+              <Text style={styles.ratingText}>Avalie a Savóia e ajude a melhorar nossa experiência.</Text>
             </View>
-            <Pressable
-              onPress={handleRateApp}
-              style={({ pressed }) => [
-                styles.ratingButton,
-                pressed && { opacity: 0.86 },
-              ]}
-            >
-              <Text style={styles.ratingButtonText}>
-                {Platform.OS === "ios" ? "App Store" : "Google Play"}
-              </Text>
+            <Pressable onPress={handleRateApp} style={({ pressed }) => [styles.ratingButton, pressed && { opacity: 0.86 }]}>
+              <Text style={styles.ratingButtonText}>{Platform.OS === "ios" ? "App Store" : "Google Play"}</Text>
             </Pressable>
           </View>
 
-          <Pressable
-            onPress={handleLogout}
-            style={({ pressed }) => [
-              styles.logoutButton,
-              pressed && { opacity: 0.76 },
-            ]}
-          >
+          <Pressable onPress={handleLogout} style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.76 }]}>
             <Ionicons name="log-out-outline" size={20} color="#B72E2E" />
             <Text style={styles.logoutText}>Sair da conta</Text>
           </Pressable>
@@ -334,10 +222,7 @@ export default function MenuScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: SCREEN_BG,
-  },
+  root: { flex: 1, backgroundColor: SCREEN_BG },
   watermark: {
     position: "absolute",
     top: 120,
@@ -359,10 +244,7 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     paddingHorizontal: 18,
   },
-  logo: {
-    width: 96,
-    height: 96,
-  },
+  logo: { width: 96, height: 96 },
   greeting: {
     marginTop: 6,
     color: "#FFFFFF",
@@ -383,11 +265,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(241,230,168,0.48)",
   },
-  profileButtonText: {
-    color: "#F1E6A8",
-    fontSize: 15,
-    fontWeight: "800",
-  },
+  profileButtonText: { color: "#F1E6A8", fontSize: 15, fontWeight: "800" },
   description: {
     maxWidth: 320,
     marginTop: 12,
@@ -406,9 +284,7 @@ const styles = StyleSheet.create({
     paddingTop: 28,
     paddingBottom: 30,
   },
-  section: {
-    marginBottom: 2,
-  },
+  section: { marginBottom: 2 },
   sectionTitle: {
     color: "#123D2A",
     fontSize: 18,
@@ -416,11 +292,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 14,
   },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: GRID_GAP,
-  },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP },
   menuCard: {
     width: GRID_CARD_WIDTH,
     minHeight: 112,
@@ -433,10 +305,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 14,
   },
-  menuCardPressed: {
-    transform: [{ scale: 0.985 }],
-    opacity: 0.84,
-  },
+  menuCardWide: { width: CARD_WIDTH - PANEL_PADDING * 2 },
+  menuCardPressed: { transform: [{ scale: 0.985 }], opacity: 0.84 },
   menuIconWrap: {
     width: 48,
     height: 48,
@@ -453,11 +323,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: "center",
   },
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(18,61,42,0.14)",
-    marginVertical: 24,
-  },
+  divider: { height: 1, backgroundColor: "rgba(18,61,42,0.14)", marginVertical: 24 },
   ratingCard: {
     marginTop: 24,
     borderRadius: 18,
@@ -477,20 +343,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(12,106,61,0.08)",
   },
-  ratingTextBlock: {
-    flex: 1,
-  },
-  ratingTitle: {
-    color: "#123D2A",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  ratingText: {
-    color: "rgba(18,61,42,0.72)",
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 3,
-  },
+  ratingTextBlock: { flex: 1 },
+  ratingTitle: { color: "#123D2A", fontSize: 15, fontWeight: "900" },
+  ratingText: { color: "rgba(18,61,42,0.72)", fontSize: 12, lineHeight: 16, marginTop: 3 },
   ratingButton: {
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -499,11 +354,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(12,106,61,0.20)",
   },
-  ratingButtonText: {
-    color: "#F1E6A8",
-    fontSize: 12,
-    fontWeight: "900",
-  },
+  ratingButtonText: { color: "#F1E6A8", fontSize: 12, fontWeight: "900" },
   logoutButton: {
     marginTop: 22,
     minHeight: 46,
@@ -516,15 +367,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(183,46,46,0.16)",
   },
-  logoutText: {
-    color: "#B72E2E",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  versionText: {
-    marginTop: 14,
-    color: "rgba(18,61,42,0.46)",
-    fontSize: 12,
-    textAlign: "center",
-  },
+  logoutText: { color: "#B72E2E", fontSize: 14, fontWeight: "900" },
+  versionText: { marginTop: 14, color: "rgba(18,61,42,0.46)", fontSize: 12, textAlign: "center" },
 });
