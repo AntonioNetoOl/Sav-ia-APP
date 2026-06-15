@@ -24,7 +24,6 @@ const TOP_SPACING = Platform.OS === "android" ? (StatusBar.currentHeight || 0) +
 const TABS = [
   { key: "history", label: "Histórico", icon: "receipt-outline" },
   { key: "cards", label: "Cartões", icon: "credit-card-outline", iconLib: "mci" },
-  { key: "add-card", label: "Cadastrar", icon: "add-circle-outline" },
 ];
 
 function normalizeTab(tab) {
@@ -59,7 +58,7 @@ function getCardExpiration(card) {
 
 function BackButton({ navigation }) {
   return (
-    <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.72 }]}> 
+    <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.72 }]}>
       <Ionicons name="arrow-back" size={21} color="#FFFFFF" />
       <Text style={styles.backText}>Voltar</Text>
     </Pressable>
@@ -69,7 +68,7 @@ function BackButton({ navigation }) {
 function TabButton({ tab, active, onPress }) {
   const IconComponent = tab.iconLib === "mci" ? MaterialCommunityIcons : Ionicons;
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.tabButton, active && styles.tabButtonActive, pressed && { opacity: 0.82 }]}> 
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.tabButton, active && styles.tabButtonActive, pressed && { opacity: 0.82 }]}>
       <IconComponent name={tab.icon} size={18} color={active ? "#F1E6A8" : "rgba(18,61,42,0.62)"} />
       <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
     </Pressable>
@@ -123,8 +122,8 @@ function CardsList({ cards, loading, error, onAddCard }) {
     return (
       <View>
         <EmptyState icon="card-outline" title="Nenhum cartão cadastrado" description="O cadastro de cartão será liberado com a integração do gateway de pagamento." />
-        <Pressable onPress={onAddCard} style={({ pressed }) => [styles.primaryAction, pressed && { opacity: 0.84 }]}> 
-          <Text style={styles.primaryActionText}>Ir para cadastro</Text>
+        <Pressable onPress={onAddCard} style={({ pressed }) => [styles.primaryAction, pressed && { opacity: 0.84 }]}>
+          <Text style={styles.primaryActionText}>Cadastrar cartão</Text>
         </Pressable>
       </View>
     );
@@ -149,14 +148,14 @@ function CardsList({ cards, loading, error, onAddCard }) {
         </View>
       ))}
 
-      <Pressable onPress={onAddCard} style={({ pressed }) => [styles.primaryAction, pressed && { opacity: 0.84 }]}> 
+      <Pressable onPress={onAddCard} style={({ pressed }) => [styles.primaryAction, pressed && { opacity: 0.84 }]}>
         <Text style={styles.primaryActionText}>Cadastrar novo cartão</Text>
       </Pressable>
     </View>
   );
 }
 
-function AddCardPlaceholder() {
+function AddCardPlaceholder({ onBackToCards }) {
   return (
     <View style={styles.addCardBox}>
       <View style={styles.addCardIcon}>
@@ -164,8 +163,11 @@ function AddCardPlaceholder() {
       </View>
       <Text style={styles.addCardTitle}>Cadastro de cartão em preparação</Text>
       <Text style={styles.addCardText}>Esta área está reservada para a futura integração com gateway de pagamento. Por segurança, o app ainda não coleta número de cartão, CVV ou dados sensíveis nesta versão.</Text>
-      <Pressable onPress={() => Alert.alert("Em breve", "O cadastro de cartão será liberado após a integração financeira.")} style={({ pressed }) => [styles.disabledAction, pressed && { opacity: 0.84 }]}> 
+      <Pressable onPress={() => Alert.alert("Em breve", "O cadastro de cartão será liberado após a integração financeira.")} style={({ pressed }) => [styles.disabledAction, pressed && { opacity: 0.84 }]}>
         <Text style={styles.disabledActionText}>Disponível em breve</Text>
+      </Pressable>
+      <Pressable onPress={onBackToCards} style={({ pressed }) => [styles.secondaryAction, pressed && { opacity: 0.84 }]}>
+        <Text style={styles.secondaryActionText}>Voltar para cartões</Text>
       </Pressable>
     </View>
   );
@@ -217,7 +219,7 @@ export default function PaymentsScreen({ navigation, route }) {
         <View style={styles.header}>
           <View style={styles.headerIcon}><MaterialCommunityIcons name="credit-card-outline" size={34} color="#F1E6A8" /></View>
           <Text style={styles.title}>Pagamentos</Text>
-          <Text style={styles.subtitle}>Acompanhe cobranças, cartões e a futura área de cadastro.</Text>
+          <Text style={styles.subtitle}>Acompanhe seu histórico e seus cartões cadastrados.</Text>
         </View>
 
         <View style={styles.summaryRow}>
@@ -226,11 +228,13 @@ export default function PaymentsScreen({ navigation, route }) {
         </View>
 
         <View style={styles.panel}>
-          <View style={styles.tabs}>{TABS.map((tab) => <TabButton key={tab.key} tab={tab} active={tab.key === activeTab} onPress={() => setActiveTab(tab.key)} />)}</View>
+          {activeTab !== "add-card" && (
+            <View style={styles.tabs}>{TABS.map((tab) => <TabButton key={tab.key} tab={tab} active={tab.key === activeTab} onPress={() => setActiveTab(tab.key)} />)}</View>
+          )}
           <View style={styles.tabContent}>
             {activeTab === "history" && <PaymentHistory payments={payments} loading={loading} error={error} />}
             {activeTab === "cards" && <CardsList cards={cards} loading={loading} error={error} onAddCard={() => setActiveTab("add-card")} />}
-            {activeTab === "add-card" && <AddCardPlaceholder />}
+            {activeTab === "add-card" && <AddCardPlaceholder onBackToCards={() => setActiveTab("cards")} />}
           </View>
         </View>
       </ScrollView>
@@ -291,4 +295,6 @@ const styles = StyleSheet.create({
   addCardText: { color: "rgba(18,61,42,0.72)", fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: "center" },
   disabledAction: { marginTop: 18, borderRadius: 16, paddingVertical: 13, paddingHorizontal: 18, backgroundColor: "rgba(18,61,42,0.12)" },
   disabledActionText: { color: "rgba(18,61,42,0.62)", fontSize: 14, fontWeight: "900" },
+  secondaryAction: { marginTop: 12, borderRadius: 16, paddingVertical: 13, paddingHorizontal: 18, backgroundColor: "#0C6A3D" },
+  secondaryActionText: { color: "#F1E6A8", fontSize: 14, fontWeight: "900" },
 });
