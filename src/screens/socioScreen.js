@@ -32,29 +32,50 @@ const FALLBACK_SUMMARY = {
   },
   association: {
     title: "Não associado",
-    description: "Você ainda não possui uma associação ativa vinculada à sua conta.",
+    description: "Você ainda não possui uma associação vinculada à sua conta.",
     memberNumber: null,
     since: null,
+    linked: false,
   },
+  plan: null,
   loyalty: {
     title: "Fidelidade Savóia",
-    description: "A fidelidade será liberada após ativação da associação.",
+    description: "A fidelidade será calculada a partir das mensalidades pagas pelo app.",
     paidInstallments: 0,
     requiredInstallments: 12,
-    nextBenefitLabel: "Item grátis na loja",
+    progressPercent: 0,
+    nextGiftLabel: null,
+    giftAvailable: false,
   },
   payments: {
     title: "Pagamentos",
     description: "Acompanhe histórico, próximos lançamentos e cartões cadastrados.",
     nextChargeLabel: null,
+    nextChargeDueAt: null,
     recurrenceEnabled: false,
+    subscriptionStatus: null,
   },
   benefits: {
     title: "Benefícios",
-    description: "Benefícios serão exibidos após ativação da associação.",
+    description: "Benefícios de sócio ativo ficam disponíveis após ativação ou regularização da associação.",
     availableCount: 0,
+    storeDiscountPercent: 0,
+    gift: null,
   },
 };
+
+function mergeSummary(data) {
+  return {
+    ...FALLBACK_SUMMARY,
+    ...(data || {}),
+    user: { ...FALLBACK_SUMMARY.user, ...(data?.user || {}) },
+    statusCard: { ...FALLBACK_SUMMARY.statusCard, ...(data?.statusCard || {}) },
+    association: { ...FALLBACK_SUMMARY.association, ...(data?.association || {}) },
+    loyalty: { ...FALLBACK_SUMMARY.loyalty, ...(data?.loyalty || {}) },
+    payments: { ...FALLBACK_SUMMARY.payments, ...(data?.payments || {}) },
+    benefits: { ...FALLBACK_SUMMARY.benefits, ...(data?.benefits || {}) },
+  };
+}
 
 function getStatusTheme(memberStatus) {
   if (memberStatus === "socio_ativo") {
@@ -68,7 +89,7 @@ function getStatusTheme(memberStatus) {
 
   if (memberStatus === "socio_inativo") {
     return {
-      label: "Em validação",
+      label: "Sócio inativo",
       icon: "clock-outline",
       color: "#9A6A13",
       soft: "rgba(181,132,22,0.16)",
@@ -83,12 +104,17 @@ function getStatusTheme(memberStatus) {
   };
 }
 
-function ProgressBar({ current = 0, total = 12 }) {
-  const percent = Math.max(0, Math.min(100, Math.round((Number(current) / Number(total || 1)) * 100)));
+function formatPercent(value) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? Math.round(number) : 0;
+}
+
+function ProgressBar({ percent = 0 }) {
+  const safePercent = Math.max(0, Math.min(100, Math.round(Number(percent || 0))));
 
   return (
     <View style={styles.progressTrack}>
-      <View style={[styles.progressFill, { width: `${percent}%` }]} />
+      <View style={[styles.progressFill, { width: `${safePercent}%` }]} />
     </View>
   );
 }
@@ -107,6 +133,47 @@ function StatusCard({ summary }) {
         </View>
         <Text style={styles.statusTitle}>{summary.statusCard?.title}</Text>
         <Text style={styles.statusDescription}>{summary.statusCard?.description}</Text>
+      </View>
+    </View>
+  );
+}
+
+function PlanCard({ plan }) {
+  if (!plan) return null;
+
+  return (
+    <View style={styles.planCard}>
+      <View style={styles.planHeader}>
+        <View style={styles.planTitleBlock}>
+          <Text style={styles.planEyebrow}>Plano atual</Text>
+          <Text style={styles.planTitle}>{plan.name}</Text>
+        </View>
+        <View style={styles.planPriceBadge}>
+          <Text style={styles.planPrice}>{plan.monthlyAmountLabel}</Text>
+          <Text style={styles.planPriceSub}>mês</Text>
+        </View>
+      </View>
+
+      <View style={styles.planPillsRow}>
+        <Text style={styles.planPill}>{formatPercent(plan.storeDiscountPercent)}% nas lojas</Text>
+        <Text style={styles.planPill}>{plan.requiredInstallmentsForGift || 12} mensalidades</Text>
+      </View>
+
+      {!!plan.giftDescription && <Text style={styles.planGift}>{plan.giftDescription}</Text>}
+    </View>
+  );
+}
+
+function GiftCard({ gift }) {
+  if (!gift) return null;
+
+  return (
+    <View style={styles.giftCard}>
+      <MaterialCommunityIcons name="gift-outline" size={28} color="#F1E6A8" />
+      <View style={styles.giftTextBlock}>
+        <Text style={styles.giftTitle}>Brinde disponível</Text>
+        <Text style={styles.giftText}>{gift.description}</Text>
+        <Text style={styles.giftFooter}>{gift.stockNotice || "Sujeito à disponibilidade em estoque."}</Text>
       </View>
     </View>
   );
@@ -138,7 +205,7 @@ export default function SocioScreen({ navigation }) {
     setError(false);
     try {
       const { data } = await getMemberSummary();
-      setSummary({ ...FALLBACK_SUMMARY, ...(data || {}) });
+      setSummary(mergeSummary(data));
     } catch (_err) {
       setError(true);
       setSummary(FALLBACK_SUMMARY);
@@ -157,13 +224,41 @@ export default function SocioScreen({ navigation }) {
     loadSummary();
   }, [loadSummary]);
 
+  const plan = summary.plan;
   const loyalty = summary.loyalty || FALLBACK_SUMMARY.loyalty;
-  const loyaltyFooter = `${loyalty.paidInstallments || 0}/${loyalty.requiredInstallments || 12} mensalidades para o próximo benefício`;
-  const progressPercent = useMemo(() => {
+  const payments = summary.payments || FALLBACK_SUMMARY.payments;
+  const benefits = summary.benefits || FALLBACK_SUMMARY.benefits;
+  const gift = benefits.gift;
+
+  const loyaltyData = useMemo(() => {
     const paid = Number(loyalty.paidInstallments || 0);
     const total = Number(loyalty.requiredInstallments || 12);
-    return Math.max(0, Math.min(100, Math.round((paid / total) * 100)));
-  }, [loyalty.paidInstallments, loyalty.requiredInstallments]);
+    const percent = Number.isFinite(Number(loyalty.progressPercent))
+      ? Number(loyalty.progressPercent)
+      : Math.round((paid / Number(total || 1)) * 100);
+
+    return {
+      paid: Math.max(0, paid),
+      total: Math.max(1, total),
+      percent: Math.max(0, Math.min(100, percent)),
+    };
+  }, [loyalty.paidInstallments, loyalty.progressPercent, loyalty.requiredInstallments]);
+
+  const loyaltyFooter = loyalty.giftAvailable
+    ? "Brinde disponível para retirada na sede."
+    : `${loyaltyData.paid}/${loyaltyData.total} mensalidades consecutivas para o brinde`;
+
+  const paymentsFooter = payments.nextChargeLabel
+    ? `Próximo lançamento: ${payments.nextChargeLabel}`
+    : payments.subscriptionStatus
+      ? `Assinatura: ${payments.subscriptionStatus}`
+      : "Sem recorrência ativa no momento.";
+
+  const benefitsFooter = gift
+    ? "Brinde disponível na sede"
+    : benefits.storeDiscountPercent
+      ? `${formatPercent(benefits.storeDiscountPercent)}% de desconto nas lojas`
+      : "Nenhum benefício ativo no momento.";
 
   return (
     <View style={styles.root}>
@@ -178,7 +273,7 @@ export default function SocioScreen({ navigation }) {
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Área do sócio</Text>
           <Text style={styles.title}>Olá, {summary.user?.name || "torcedor"}</Text>
-          <Text style={styles.subtitle}>Acompanhe sua associação, fidelidade, pagamentos e benefícios.</Text>
+          <Text style={styles.subtitle}>Acompanhe sua associação, plano, fidelidade, pagamentos e benefícios.</Text>
         </View>
 
         {loading ? (
@@ -193,6 +288,8 @@ export default function SocioScreen({ navigation }) {
             )}
 
             <StatusCard summary={summary} />
+            <PlanCard plan={plan} />
+            <GiftCard gift={gift} />
 
             <View style={styles.loyaltyCard}>
               <View style={styles.loyaltyHeader}>
@@ -200,9 +297,9 @@ export default function SocioScreen({ navigation }) {
                   <Text style={styles.loyaltyTitle}>{loyalty.title}</Text>
                   <Text style={styles.loyaltyText}>{loyalty.description}</Text>
                 </View>
-                <Text style={styles.loyaltyPercent}>{progressPercent}%</Text>
+                <Text style={styles.loyaltyPercent}>{loyaltyData.percent}%</Text>
               </View>
-              <ProgressBar current={loyalty.paidInstallments} total={loyalty.requiredInstallments} />
+              <ProgressBar percent={loyaltyData.percent} />
               <Text style={styles.loyaltyFooter}>{loyaltyFooter}</Text>
             </View>
 
@@ -219,17 +316,17 @@ export default function SocioScreen({ navigation }) {
 
               <InfoCard
                 icon="credit-card-outline"
-                title={summary.payments?.title}
-                description={summary.payments?.description}
-                footer={summary.payments?.nextChargeLabel ? `Próximo lançamento: ${summary.payments.nextChargeLabel}` : "Sem recorrência ativa no momento."}
+                title={payments.title}
+                description={payments.description}
+                footer={paymentsFooter}
                 onPress={() => navigation.navigate("Payments", { initialTab: "history" })}
               />
 
               <InfoCard
                 icon="ticket-percent-outline"
-                title={summary.benefits?.title}
-                description={summary.benefits?.description}
-                footer={`${summary.benefits?.availableCount || 0} benefício disponível`}
+                title={benefits.title}
+                description={benefits.description}
+                footer={benefitsFooter}
                 onPress={() => navigation.navigate("Benefits")}
               />
 
@@ -289,6 +386,39 @@ const styles = StyleSheet.create({
   statusPillText: { fontSize: 11, fontWeight: "900" },
   statusTitle: { color: "#123D2A", fontSize: 20, fontWeight: "900" },
   statusDescription: { color: "rgba(18,61,42,0.72)", fontSize: 14, lineHeight: 20, marginTop: 6 },
+  planCard: {
+    marginTop: 14,
+    borderRadius: 24,
+    backgroundColor: "rgba(247,250,245,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    padding: 17,
+  },
+  planHeader: { flexDirection: "row", justifyContent: "space-between", gap: 12, alignItems: "flex-start" },
+  planTitleBlock: { flex: 1 },
+  planEyebrow: { color: "rgba(18,61,42,0.56)", fontSize: 11, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
+  planTitle: { color: "#123D2A", fontSize: 22, fontWeight: "900", marginTop: 4 },
+  planPriceBadge: { backgroundColor: "#0C6A3D", borderRadius: 18, paddingHorizontal: 12, paddingVertical: 9, alignItems: "center" },
+  planPrice: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
+  planPriceSub: { color: "rgba(255,255,255,0.72)", fontSize: 10, fontWeight: "800", marginTop: 1 },
+  planPillsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
+  planPill: { backgroundColor: "rgba(12,106,61,0.10)", color: "#123D2A", borderRadius: 999, overflow: "hidden", paddingHorizontal: 10, paddingVertical: 6, fontSize: 12, fontWeight: "900" },
+  planGift: { color: "rgba(18,61,42,0.70)", fontSize: 13, lineHeight: 18, fontWeight: "800", marginTop: 11 },
+  giftCard: {
+    marginTop: 14,
+    borderRadius: 22,
+    backgroundColor: "rgba(12,106,61,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(241,230,168,0.28)",
+    padding: 16,
+    flexDirection: "row",
+    gap: 13,
+    alignItems: "center",
+  },
+  giftTextBlock: { flex: 1 },
+  giftTitle: { color: "#FFFFFF", fontSize: 17, fontWeight: "900" },
+  giftText: { color: "rgba(255,255,255,0.82)", fontSize: 13, lineHeight: 18, marginTop: 4, fontWeight: "700" },
+  giftFooter: { color: "#F1E6A8", fontSize: 12, lineHeight: 17, fontWeight: "900", marginTop: 6 },
   loyaltyCard: {
     marginTop: 14,
     borderRadius: 24,
