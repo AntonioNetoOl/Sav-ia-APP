@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 
-import { getMemberSummary } from "../api/memberClient";
+import { getMemberPlans, getMemberSummary } from "../api/memberClient";
 import BottomNavigation from "../components/bottomNavigation";
 
 const SCREEN_BG = "#05271A";
@@ -104,6 +104,28 @@ function getStatusTheme(memberStatus) {
   };
 }
 
+function getAssociationAction(memberStatus) {
+  if (memberStatus === "socio_inativo") {
+    return {
+      eyebrow: "Regularização",
+      title: "Regularizar associação",
+      description: "Sua associação está inativa. Escolha um plano para voltar a acessar benefícios de sócio ativo quando o fluxo financeiro for liberado.",
+      buttonLabel: "Ver planos disponíveis",
+      alertTitle: "Regularizar associação",
+      alertMessage: "A escolha de plano já usa dados reais. A próxima etapa será conectar esse fluxo à criação de assinatura/cobrança, sem gateway real por enquanto.",
+    };
+  }
+
+  return {
+    eyebrow: "Associação",
+    title: "Conheça os planos Savóia",
+    description: "Associe-se para acompanhar plano, pagamentos, benefícios e fidelidade pelo app.",
+    buttonLabel: "Conhecer planos",
+    alertTitle: "Associar-se",
+    alertMessage: "Os planos já são carregados do backend. A próxima etapa será criar o fluxo de escolha do plano, ainda sem checkout real.",
+  };
+}
+
 function formatPercent(value) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? Math.round(number) : 0;
@@ -164,6 +186,83 @@ function PlanCard({ plan }) {
   );
 }
 
+function AssociationActionCard({ memberStatus, onPress }) {
+  const action = getAssociationAction(memberStatus);
+
+  return (
+    <View style={styles.actionCard}>
+      <View style={styles.actionIconWrap}>
+        <MaterialCommunityIcons name="account-heart-outline" size={30} color="#F1E6A8" />
+      </View>
+      <View style={styles.actionTextBlock}>
+        <Text style={styles.actionEyebrow}>{action.eyebrow}</Text>
+        <Text style={styles.actionTitle}>{action.title}</Text>
+        <Text style={styles.actionDescription}>{action.description}</Text>
+        <Pressable onPress={onPress} style={({ pressed }) => [styles.primaryButton, pressed && { opacity: 0.86 }]}> 
+          <Text style={styles.primaryButtonText}>{action.buttonLabel}</Text>
+          <Ionicons name="arrow-forward" size={16} color="#123D2A" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function AvailablePlanCard({ plan, onPress }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.availablePlanCard, pressed && { opacity: 0.9 }]}> 
+      <View style={styles.availablePlanHeader}>
+        <View style={styles.planTitleBlock}>
+          <Text style={styles.planEyebrow}>Plano disponível</Text>
+          <Text style={styles.availablePlanTitle}>{plan.name}</Text>
+        </View>
+        <View style={styles.availablePriceBadge}>
+          <Text style={styles.availablePlanPrice}>{plan.monthlyAmountLabel}</Text>
+          <Text style={styles.availablePlanPriceSub}>mês</Text>
+        </View>
+      </View>
+
+      <View style={styles.planPillsRow}>
+        <Text style={styles.planPill}>{formatPercent(plan.storeDiscountPercent)}% nas lojas</Text>
+        <Text style={styles.planPill}>{plan.requiredInstallmentsForGift || 12} mensalidades</Text>
+      </View>
+
+      {!!plan.giftDescription && <Text style={styles.planGift}>{plan.giftDescription}</Text>}
+
+      <View style={styles.availablePlanFooter}>
+        <Text style={styles.availablePlanFooterText}>Selecionar plano</Text>
+        <Ionicons name="chevron-forward" size={16} color="#0C6A3D" />
+      </View>
+    </Pressable>
+  );
+}
+
+function AvailablePlansSection({ plans, plansError, onPlanPress }) {
+  return (
+    <View style={styles.plansSection}>
+      <Text style={styles.sectionTitle}>Planos disponíveis</Text>
+      <Text style={styles.sectionSubtitle}>Valores, descontos e brindes vêm do backend.</Text>
+
+      {plansError && (
+        <View style={styles.warningBox}>
+          <Ionicons name="warning-outline" size={19} color="#9A6A13" />
+          <Text style={styles.warningText}>Não foi possível carregar os planos agora.</Text>
+        </View>
+      )}
+
+      {!plansError && plans.length === 0 && (
+        <View style={styles.emptyPlansBox}>
+          <Text style={styles.emptyPlansTitle}>Nenhum plano disponível</Text>
+          <Text style={styles.emptyPlansText}>Quando a Savóia ativar planos no backend, eles aparecerão aqui.</Text>
+        </View>
+      )}
+
+      {plans.map((plan) => (
+        <AvailablePlanCard key={plan.code || String(plan.id)} plan={plan} onPress={() => onPlanPress(plan)} />
+      ))}
+    </View>
+  );
+}
+
 function GiftCard({ gift }) {
   if (!gift) return null;
 
@@ -197,18 +296,36 @@ function InfoCard({ icon, title, description, footer, onPress }) {
 
 export default function SocioScreen({ navigation }) {
   const [summary, setSummary] = useState(FALLBACK_SUMMARY);
+  const [availablePlans, setAvailablePlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
+  const [plansError, setPlansError] = useState(false);
 
-  const loadSummary = useCallback(async () => {
+  const loadMemberArea = useCallback(async () => {
     setError(false);
+    setPlansError(false);
+
     try {
-      const { data } = await getMemberSummary();
-      setSummary(mergeSummary(data));
-    } catch (_err) {
-      setError(true);
-      setSummary(FALLBACK_SUMMARY);
+      const [summaryResult, plansResult] = await Promise.allSettled([
+        getMemberSummary(),
+        getMemberPlans(),
+      ]);
+
+      if (summaryResult.status === "fulfilled") {
+        setSummary(mergeSummary(summaryResult.value?.data));
+      } else {
+        setError(true);
+        setSummary(FALLBACK_SUMMARY);
+      }
+
+      if (plansResult.status === "fulfilled") {
+        const plans = plansResult.value?.data?.plans;
+        setAvailablePlans(Array.isArray(plans) ? plans : []);
+      } else {
+        setPlansError(true);
+        setAvailablePlans([]);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -216,19 +333,21 @@ export default function SocioScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    loadSummary();
-  }, [loadSummary]);
+    loadMemberArea();
+  }, [loadMemberArea]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadSummary();
-  }, [loadSummary]);
+    loadMemberArea();
+  }, [loadMemberArea]);
 
   const plan = summary.plan;
   const loyalty = summary.loyalty || FALLBACK_SUMMARY.loyalty;
   const payments = summary.payments || FALLBACK_SUMMARY.payments;
   const benefits = summary.benefits || FALLBACK_SUMMARY.benefits;
   const gift = benefits.gift;
+  const isActiveMember = summary.memberStatus === "socio_ativo";
+  const shouldShowPlanOptions = !isActiveMember;
 
   const loyaltyData = useMemo(() => {
     const paid = Number(loyalty.paidInstallments || 0);
@@ -248,17 +367,33 @@ export default function SocioScreen({ navigation }) {
     ? "Brinde disponível para retirada na sede."
     : `${loyaltyData.paid}/${loyaltyData.total} mensalidades consecutivas para o brinde`;
 
-  const paymentsFooter = payments.nextChargeLabel
-    ? `Próximo lançamento: ${payments.nextChargeLabel}`
-    : payments.subscriptionStatus
-      ? `Assinatura: ${payments.subscriptionStatus}`
-      : "Sem recorrência ativa no momento.";
+  const paymentsFooter = isActiveMember
+    ? payments.nextChargeLabel
+      ? `Próximo lançamento: ${payments.nextChargeLabel}`
+      : payments.subscriptionStatus
+        ? `Assinatura: ${payments.subscriptionStatus}`
+        : "Sem recorrência ativa no momento."
+    : "Regularização ainda sem checkout no app.";
 
-  const benefitsFooter = gift
-    ? "Brinde disponível na sede"
-    : benefits.storeDiscountPercent
-      ? `${formatPercent(benefits.storeDiscountPercent)}% de desconto nas lojas`
-      : "Nenhum benefício ativo no momento.";
+  const benefitsFooter = !isActiveMember
+    ? "Benefícios bloqueados até ativação ou regularização."
+    : gift
+      ? "Brinde disponível na sede"
+      : benefits.storeDiscountPercent
+        ? `${formatPercent(benefits.storeDiscountPercent)}% de desconto nas lojas`
+        : "Nenhum benefício ativo no momento.";
+
+  const handleAssociationAction = useCallback(() => {
+    const action = getAssociationAction(summary.memberStatus);
+    Alert.alert(action.alertTitle, action.alertMessage);
+  }, [summary.memberStatus]);
+
+  const handlePlanPress = useCallback((selectedPlan) => {
+    Alert.alert(
+      selectedPlan?.name || "Plano",
+      "Plano carregado do backend. A próxima etapa será criar a intenção de associação/regularização sem gateway real."
+    );
+  }, []);
 
   return (
     <View style={styles.root}>
@@ -288,20 +423,31 @@ export default function SocioScreen({ navigation }) {
             )}
 
             <StatusCard summary={summary} />
-            <PlanCard plan={plan} />
-            <GiftCard gift={gift} />
 
-            <View style={styles.loyaltyCard}>
-              <View style={styles.loyaltyHeader}>
-                <View>
-                  <Text style={styles.loyaltyTitle}>{loyalty.title}</Text>
-                  <Text style={styles.loyaltyText}>{loyalty.description}</Text>
+            {isActiveMember ? (
+              <>
+                <PlanCard plan={plan} />
+                <GiftCard gift={gift} />
+
+                <View style={styles.loyaltyCard}>
+                  <View style={styles.loyaltyHeader}>
+                    <View>
+                      <Text style={styles.loyaltyTitle}>{loyalty.title}</Text>
+                      <Text style={styles.loyaltyText}>{loyalty.description}</Text>
+                    </View>
+                    <Text style={styles.loyaltyPercent}>{loyaltyData.percent}%</Text>
+                  </View>
+                  <ProgressBar percent={loyaltyData.percent} />
+                  <Text style={styles.loyaltyFooter}>{loyaltyFooter}</Text>
                 </View>
-                <Text style={styles.loyaltyPercent}>{loyaltyData.percent}%</Text>
-              </View>
-              <ProgressBar percent={loyaltyData.percent} />
-              <Text style={styles.loyaltyFooter}>{loyaltyFooter}</Text>
-            </View>
+              </>
+            ) : (
+              <AssociationActionCard memberStatus={summary.memberStatus} onPress={handleAssociationAction} />
+            )}
+
+            {shouldShowPlanOptions && (
+              <AvailablePlansSection plans={availablePlans} plansError={plansError} onPlanPress={handlePlanPress} />
+            )}
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Minha área</Text>
@@ -319,7 +465,9 @@ export default function SocioScreen({ navigation }) {
                 title={payments.title}
                 description={payments.description}
                 footer={paymentsFooter}
-                onPress={() => navigation.navigate("Payments", { initialTab: "history" })}
+                onPress={() => isActiveMember
+                  ? navigation.navigate("Payments", { initialTab: "history" })
+                  : Alert.alert("Pagamentos", "A regularização financeira será conectada em uma etapa futura.")}
               />
 
               <InfoCard
@@ -327,7 +475,9 @@ export default function SocioScreen({ navigation }) {
                 title={benefits.title}
                 description={benefits.description}
                 footer={benefitsFooter}
-                onPress={() => navigation.navigate("Benefits")}
+                onPress={() => isActiveMember
+                  ? navigation.navigate("Benefits")
+                  : Alert.alert("Benefícios", "Benefícios ficam disponíveis após ativação ou regularização da associação.")}
               />
 
               <InfoCard
@@ -404,6 +554,43 @@ const styles = StyleSheet.create({
   planPillsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
   planPill: { backgroundColor: "rgba(12,106,61,0.10)", color: "#123D2A", borderRadius: 999, overflow: "hidden", paddingHorizontal: 10, paddingVertical: 6, fontSize: 12, fontWeight: "900" },
   planGift: { color: "rgba(18,61,42,0.70)", fontSize: 13, lineHeight: 18, fontWeight: "800", marginTop: 11 },
+  actionCard: {
+    marginTop: 14,
+    borderRadius: 24,
+    backgroundColor: "rgba(247,250,245,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    padding: 17,
+    flexDirection: "row",
+    gap: 13,
+  },
+  actionIconWrap: { width: 52, height: 52, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(12,106,61,0.92)" },
+  actionTextBlock: { flex: 1 },
+  actionEyebrow: { color: "rgba(18,61,42,0.56)", fontSize: 11, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
+  actionTitle: { color: "#123D2A", fontSize: 21, fontWeight: "900", marginTop: 4 },
+  actionDescription: { color: "rgba(18,61,42,0.70)", fontSize: 13, lineHeight: 19, fontWeight: "800", marginTop: 6 },
+  primaryButton: { marginTop: 13, alignSelf: "flex-start", borderRadius: 999, backgroundColor: "#F1E6A8", paddingHorizontal: 14, paddingVertical: 9, flexDirection: "row", alignItems: "center", gap: 7 },
+  primaryButtonText: { color: "#123D2A", fontSize: 13, fontWeight: "900" },
+  plansSection: { marginTop: 18 },
+  sectionSubtitle: { color: "rgba(255,255,255,0.70)", fontSize: 13, lineHeight: 18, fontWeight: "700", marginTop: -4, marginBottom: 10 },
+  availablePlanCard: {
+    borderRadius: 22,
+    backgroundColor: "rgba(247,250,245,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    padding: 15,
+    marginBottom: 12,
+  },
+  availablePlanHeader: { flexDirection: "row", justifyContent: "space-between", gap: 12, alignItems: "flex-start" },
+  availablePlanTitle: { color: "#123D2A", fontSize: 20, fontWeight: "900", marginTop: 4 },
+  availablePriceBadge: { backgroundColor: "rgba(12,106,61,0.10)", borderRadius: 16, paddingHorizontal: 11, paddingVertical: 8, alignItems: "center" },
+  availablePlanPrice: { color: "#0C6A3D", fontSize: 14, fontWeight: "900" },
+  availablePlanPriceSub: { color: "rgba(18,61,42,0.55)", fontSize: 10, fontWeight: "800", marginTop: 1 },
+  availablePlanFooter: { borderTopWidth: 1, borderTopColor: "rgba(18,61,42,0.08)", marginTop: 13, paddingTop: 11, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  availablePlanFooterText: { color: "#0C6A3D", fontSize: 13, fontWeight: "900" },
+  emptyPlansBox: { borderRadius: 18, backgroundColor: "rgba(247,250,245,0.86)", padding: 14, marginBottom: 12 },
+  emptyPlansTitle: { color: "#123D2A", fontSize: 15, fontWeight: "900" },
+  emptyPlansText: { color: "rgba(18,61,42,0.65)", fontSize: 12, lineHeight: 17, fontWeight: "700", marginTop: 4 },
   giftCard: {
     marginTop: 14,
     borderRadius: 22,
