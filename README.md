@@ -88,3 +88,9 @@ Projeto em desenvolvimento e evolução contínua, com integração entre aplica
 ## Objetivo técnico
 
 Além da aplicação em si, este repositório demonstra organização de um projeto mobile com separação de responsabilidades, componentes reutilizáveis, navegação, persistência local e integração com uma API REST externa.
+
+## Desenvolvimento com Codex
+
+- [Instruções para agentes](AGENTS.md)
+- [Harness de engenharia](docs/engineering/harness-engenharia.md)
+- [Adoção de Ponytail, skills e TDD](docs/engineering/adocao-codex.md)
