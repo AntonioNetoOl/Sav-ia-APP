@@ -34,7 +34,12 @@ api.interceptors.response.use(
   (r) => r,
   async (error) => {
     if (error?.response?.status === 401) {
-      try { await removeToken(); } catch {}
+      try {
+        const token = await getToken();
+        if (token && error.config?.headers?.Authorization === `Bearer ${token}`) {
+          await removeToken();
+        }
+      } catch {}
     }
     return Promise.reject(error);
   }

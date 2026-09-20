@@ -1,7 +1,8 @@
 // src/screens/socioScreen.js
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +18,7 @@ import {
 
 import { getMemberPlans, getMemberSummary } from "../api/memberClient";
 import BottomNavigation from "../components/bottomNavigation";
+import { getToken } from "../utils/storage";
 
 const SCREEN_BG = "#05271A";
 const GRADIENT_COLORS = ["#083726", "#072F20", "#05271A"];
@@ -295,28 +297,52 @@ function InfoCard({ icon, title, description, footer, onPress }) {
 }
 
 export default function SocioScreen({ navigation }) {
-  const [summary, setSummary] = useState(FALLBACK_SUMMARY);
+  const [summary, setSummary] = useState(null);
   const [availablePlans, setAvailablePlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const [plansError, setPlansError] = useState(false);
+  const requestId = useRef(0);
 
   const loadMemberArea = useCallback(async () => {
+    const currentRequest = ++requestId.current;
+    setLoading(true);
+    setSummary(null);
+    setAvailablePlans([]);
     setError(false);
     setPlansError(false);
 
     try {
+      const session = await getToken();
+      if (currentRequest !== requestId.current) return;
+      if (!session) {
+        setError("expired");
+        return;
+      }
       const [summaryResult, plansResult] = await Promise.allSettled([
         getMemberSummary(),
         getMemberPlans(),
       ]);
 
-      if (summaryResult.status === "fulfilled") {
+      const currentSession = await getToken();
+      if (currentRequest !== requestId.current) return;
+      if (currentSession !== session) {
+        setError(currentSession ? "changed" : "expired");
+        return;
+      }
+
+      if ([summaryResult, plansResult].some((result) => result.status === "rejected" && result.reason?.response?.status === 401)) {
+        setError("expired");
+        return;
+      }
+
+      if (summaryResult.status === "fulfilled" &&
+          ["nao_socio", "socio_inativo", "socio_ativo"].includes(summaryResult.value?.data?.memberStatus)) {
         setSummary(mergeSummary(summaryResult.value?.data));
       } else {
         setError(true);
-        setSummary(FALLBACK_SUMMARY);
+        setSummary(null);
       }
 
       if (plansResult.status === "fulfilled") {
@@ -327,26 +353,35 @@ export default function SocioScreen({ navigation }) {
         setAvailablePlans([]);
       }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (currentRequest === requestId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     loadMemberArea();
-  }, [loadMemberArea]);
+    return () => {
+      requestId.current += 1;
+      setSummary(null);
+      setAvailablePlans([]);
+      setLoading(true);
+    };
+  }, [loadMemberArea]));
 
   const onRefresh = useCallback(() => {
+    if (loading) return;
     setRefreshing(true);
     loadMemberArea();
-  }, [loadMemberArea]);
+  }, [loadMemberArea, loading]);
 
-  const plan = summary.plan;
-  const loyalty = summary.loyalty || FALLBACK_SUMMARY.loyalty;
-  const payments = summary.payments || FALLBACK_SUMMARY.payments;
-  const benefits = summary.benefits || FALLBACK_SUMMARY.benefits;
+  const plan = summary?.plan;
+  const loyalty = summary?.loyalty || FALLBACK_SUMMARY.loyalty;
+  const payments = summary?.payments || FALLBACK_SUMMARY.payments;
+  const benefits = summary?.benefits || FALLBACK_SUMMARY.benefits;
   const gift = benefits.gift;
-  const isActiveMember = summary.memberStatus === "socio_ativo";
+  const isActiveMember = summary?.memberStatus === "socio_ativo";
   const shouldShowPlanOptions = !isActiveMember;
 
   const loyaltyData = useMemo(() => {
@@ -384,9 +419,9 @@ export default function SocioScreen({ navigation }) {
         : "Nenhum benefício ativo no momento.";
 
   const handleAssociationAction = useCallback(() => {
-    const action = getAssociationAction(summary.memberStatus);
+    const action = getAssociationAction(summary?.memberStatus);
     Alert.alert(action.alertTitle, action.alertMessage);
-  }, [summary.memberStatus]);
+  }, [summary?.memberStatus]);
 
   const handlePlanPress = useCallback((selectedPlan) => {
     Alert.alert(
@@ -407,21 +442,28 @@ export default function SocioScreen({ navigation }) {
       >
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Área do sócio</Text>
-          <Text style={styles.title}>Olá, {summary.user?.name || "torcedor"}</Text>
+          <Text style={styles.title}>Olá, {summary?.user?.name || "torcedor"}</Text>
           <Text style={styles.subtitle}>Acompanhe sua associação, plano, fidelidade, pagamentos e benefícios.</Text>
         </View>
 
         {loading ? (
-          <ActivityIndicator color="#F1E6A8" style={styles.loading} />
-        ) : (
-          <>
-            {error && (
-              <View style={styles.warningBox}>
+          <ActivityIndicator accessibilityLabel="Carregando associação" color="#F1E6A8" style={styles.loading} />
+        ) : error ? (
+          <View>
+            <View style={styles.warningBox} accessibilityRole="alert">
                 <Ionicons name="warning-outline" size={19} color="#9A6A13" />
-                <Text style={styles.warningText}>Não foi possível carregar os dados atualizados. Exibindo visão padrão.</Text>
-              </View>
-            )}
-
+                <Text style={styles.warningText}>{error === "expired"
+                  ? "Sua sessão expirou. Entre novamente para consultar sua associação."
+                  : "Não foi possível carregar sua associação. Tente novamente."}</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={error === "expired"
+              ? () => navigation.reset({ index: 0, routes: [{ name: "Login" }] })
+              : onRefresh} style={[styles.primaryButton, styles.retryButton]}>
+              <Text style={styles.primaryButtonText}>{error === "expired" ? "Entrar novamente" : "Tentar novamente"}</Text>
+            </Pressable>
+          </View>
+        ) : summary ? (
+          <>
             <StatusCard summary={summary} />
 
             {isActiveMember ? (
@@ -489,7 +531,7 @@ export default function SocioScreen({ navigation }) {
               />
             </View>
           </>
-        )}
+        ) : null}
       </ScrollView>
 
       <BottomNavigation activeKey="socio" navigation={navigation} />
@@ -509,6 +551,7 @@ const styles = StyleSheet.create({
   title: { color: "#FFFFFF", fontSize: 27, fontWeight: "900", marginTop: 8, textAlign: "center" },
   subtitle: { color: "rgba(255,255,255,0.74)", fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: 8, maxWidth: 330 },
   loading: { marginTop: 40 },
+  retryButton: { minHeight: 44 },
   warningBox: {
     borderRadius: 16,
     backgroundColor: "rgba(241,230,168,0.16)",
