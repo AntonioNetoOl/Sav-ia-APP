@@ -27,7 +27,7 @@ Fonte de contratos e regras: [documentação do backend](https://github.com/Anto
 
 ## Verificação e limites
 
-Consulte `package.json`: há `start`, `android`, `ios`, `web`; ainda não há script de testes. Não invente `npm test`, lint ou build aprovado. `npm run ios` exige ambiente apropriado; não declare validação iOS a partir de uma inspeção no Windows.
+Consulte `package.json`: há `start`, `android`, `ios`, `web` e `test` (Jest/Expo para a tela Sócio, com HTTP e armazenamento simulados). Consulte o README para o escopo dos testes; ainda não há script de lint. Não invente resultados ou build aprovado. `npm run ios` exige ambiente apropriado; não declare validação iOS a partir de uma inspeção no Windows.
 
 Em mudança de UI, verifique carregamento, vazio, erro, sucesso, envio duplicado, retorno à tela e acessibilidade. Teste em dispositivo/emulador disponível e declare plataformas não verificadas. Para TDD, acorde a interface e a infraestrutura necessária antes de criar testes.
 

@@ -81,6 +81,14 @@ A configuração de comunicação com a API pode ser consultada em:
 
 `src/constants/config.js`
 
+## Testes da área do sócio
+
+Com Node.js 22 e as dependências do lockfile instaladas (`npm ci`), execute `npm test`. A suíte usa Jest 29, o preset Expo 54 e React Native Testing Library 14; `test-renderer` 1.1 acompanha o React 19.1 do app. São dependências de desenvolvimento, sem alteração do SDK ou de dependências diretas de produção.
+
+Os testes renderizam a tela e a navegação, simulando apenas HTTP, armazenamento e recursos nativos do ambiente de testes. Cobrem falha do resumo, carregamento, nova tentativa, resposta inválida, sessão expirada, retorno ao login, troca de sessão e respostas atrasadas. Também preservam os três estados associativos válidos e o tratamento separado de falhas do catálogo de planos. Não acessam o backend nem o banco e não substituem testes em dispositivo Android/iOS.
+
+A tela recarrega ao ganhar foco e descarta o resumo ao sair ou iniciar outra consulta. Erros não são apresentados como `nao_socio`; os botões de associação só aparecem após um resumo válido. Um `401` remove apenas o token usado pela requisição, para que respostas antigas não encerrem uma sessão nova.
+
 ## Status
 
 Projeto em desenvolvimento e evolução contínua, com integração entre aplicativo, autenticação, domínio de associados, pagamentos e fidelidade.
