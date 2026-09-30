@@ -240,6 +240,7 @@ export default function PaymentsScreen({ navigation, route }) {
           <View style={styles.headerIcon}><MaterialCommunityIcons name="credit-card-outline" size={34} color="#F1E6A8" /></View>
           <Text style={styles.title}>Pagamentos</Text>
           <Text style={styles.subtitle}>Acompanhe seu histórico, próximos lançamentos e cartões cadastrados.</Text>
+          <Text style={styles.demoNotice}>Demonstração: os lançamentos, totais e cartões abaixo são exemplos. Eles não representam seus pagamentos.</Text>
         </View>
 
         <View style={styles.summaryRow}>
@@ -261,6 +262,7 @@ export default function PaymentsScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  demoNotice: { color: "#F1E6A8", fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: 16 },
   root: { flex: 1, backgroundColor: SCREEN_BG },
   scrollContent: { paddingTop: TOP_SPACING, paddingHorizontal: 16, paddingBottom: 34 },
   backButton: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start", paddingVertical: 10 },
