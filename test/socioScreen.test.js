@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
 import api from "../src/api/client";
 import SocioScreen from "../src/screens/socioScreen";
+import PaymentsScreen from "../src/screens/paymentsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -18,6 +19,7 @@ async function renderArea() {
     <NavigationContainer ref={navigation}>
       <Stack.Navigator initialRouteName="Socio" screenOptions={{ animation: "none" }}>
         <Stack.Screen name="Socio" component={SocioScreen} />
+        <Stack.Screen name="Payments" component={PaymentsScreen} />
         <Stack.Screen name="Home">{() => <Text>Início de teste</Text>}</Stack.Screen>
         <Stack.Screen name="Login">{() => <Text>Login de teste</Text>}</Stack.Screen>
       </Stack.Navigator>
@@ -167,4 +169,69 @@ test.each([["socio_ativo", "Sócio ativo"], ["socio_inativo", "Sócio inativo"]]
   await renderArea();
   expect(screen.getByText(label)).toBeOnTheScreen();
   expect(screen.queryByText("Não sócio")).toBeNull();
+});
+
+test("mostra vencimento e status do último lançamento separadamente, inclusive para sócio inativo", async () => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : {
+    ...summary("socio_inativo"),
+    payments: { nextChargeDueAt: "2026-10-10", latestStatus: "paid", recurrenceEnabled: false },
+  }));
+  await renderArea();
+  expect(screen.getByText(/Vencimento informado: 10\/10\/2026/)).toBeOnTheScreen();
+  expect(screen.getByText(/Último lançamento: Pago/)).toBeOnTheScreen();
+  expect(screen.getByText(/Recorrência: desativada/)).toBeOnTheScreen();
+  expect(screen.getByText("Sócio inativo")).toBeOnTheScreen();
+});
+
+test.each([undefined, null, {}, { recurrenceEnabled: "false" }])("dados de pagamento incompletos não afirmam ausência de cobrança ou recorrência desativada: %j", async (payments) => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : { ...summary(), payments }));
+  await renderArea();
+  expect(screen.getByText(/Vencimento indisponível/)).toBeOnTheScreen();
+  expect(screen.getByText(/Situação do último lançamento indisponível/)).toBeOnTheScreen();
+  expect(screen.getByText(/Recorrência: não informada/)).toBeOnTheScreen();
+  expect(screen.queryByText(/Recorrência: desativada/)).toBeNull();
+});
+
+test("resposta com campos nulos informa ausência de vencimento sem afirmar quitação", async () => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : {
+    ...summary(), payments: { nextChargeDueAt: null, latestStatus: null, recurrenceEnabled: false },
+  }));
+  await renderArea();
+  expect(screen.getByText(/Nenhum vencimento informado/)).toBeOnTheScreen();
+  expect(screen.getByText(/Nenhum lançamento informado/)).toBeOnTheScreen();
+  expect(screen.queryByText(/em dia|Último lançamento: Pago/i)).toBeNull();
+});
+
+test.each(["2026-02-30", "2026-05-10Tinválido", 42, "", "2026-13-01"])("vencimento inválido não é exibido como data válida: %j", async (nextChargeDueAt) => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : {
+    ...summary(), payments: { nextChargeDueAt, latestStatus: "desconhecido", recurrenceEnabled: null },
+  }));
+  await renderArea();
+  expect(screen.getByText(/Vencimento indisponível/)).toBeOnTheScreen();
+  expect(screen.getByText(/Situação do último lançamento indisponível/)).toBeOnTheScreen();
+});
+
+test.each([
+  ["scheduled", "Agendado"], ["pending", "Aguardando pagamento"], ["paid", "Pago"],
+  ["failed", "Falhou"], ["cancelled", "Cancelado"], ["refunded", "Estornado"],
+])("traduz o estado financeiro %s sem alterar o estado associativo", async (status, label) => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : {
+    ...summary("socio_ativo"), payments: { nextChargeDueAt: "2026-05-10T00:00:00.000Z", latestStatus: status, recurrenceEnabled: true },
+  }));
+  await renderArea();
+  expect(screen.getByText(new RegExp(`Último lançamento: ${label}`))).toBeOnTheScreen();
+  expect(screen.getByText(/Vencimento informado: 10\/05\/2026/)).toBeOnTheScreen();
+  expect(screen.getByText(/Recorrência: ativa/)).toBeOnTheScreen();
+  expect(screen.getByText("Sócio ativo")).toBeOnTheScreen();
+  expect(screen.queryByText(/dias de atraso|inativação em/i)).toBeNull();
+});
+
+test("histórico acessível pela área do sócio identifica exemplos e permite voltar", async () => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] }
+    : config.url.endsWith("/summary") ? { ...summary("socio_ativo"), payments: { nextChargeDueAt: null, latestStatus: null, recurrenceEnabled: false } } : []));
+  await renderArea();
+  await fireEvent.press(screen.getByRole("button", { name: /Pagamentos.*Ver histórico de demonstração/s }));
+  expect(screen.getByText("Demonstração: os lançamentos, totais e cartões abaixo são exemplos. Eles não representam seus pagamentos.")).toBeOnTheScreen();
+  await fireEvent.press(screen.getByText("Voltar"));
+  expect(screen.getByText("Área do sócio")).toBeOnTheScreen();
 });

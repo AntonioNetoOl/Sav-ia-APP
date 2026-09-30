@@ -49,14 +49,7 @@ const FALLBACK_SUMMARY = {
     nextGiftLabel: null,
     giftAvailable: false,
   },
-  payments: {
-    title: "Pagamentos",
-    description: "Acompanhe histórico, próximos lançamentos e cartões cadastrados.",
-    nextChargeLabel: null,
-    nextChargeDueAt: null,
-    recurrenceEnabled: false,
-    subscriptionStatus: null,
-  },
+  payments: null,
   benefits: {
     title: "Benefícios",
     description: "Benefícios de sócio ativo ficam disponíveis após ativação ou regularização da associação.",
@@ -74,7 +67,7 @@ function mergeSummary(data) {
     statusCard: { ...FALLBACK_SUMMARY.statusCard, ...(data?.statusCard || {}) },
     association: { ...FALLBACK_SUMMARY.association, ...(data?.association || {}) },
     loyalty: { ...FALLBACK_SUMMARY.loyalty, ...(data?.loyalty || {}) },
-    payments: { ...FALLBACK_SUMMARY.payments, ...(data?.payments || {}) },
+    payments: data?.payments,
     benefits: { ...FALLBACK_SUMMARY.benefits, ...(data?.benefits || {}) },
   };
 }
@@ -131,6 +124,30 @@ function getAssociationAction(memberStatus) {
 function formatPercent(value) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? Math.round(number) : 0;
+}
+
+function formatDueDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}\.\d{3}Z)?$/.test(value)) return null;
+  const canonical = value.length === 10 ? `${value}T00:00:00.000Z` : value;
+  const date = new Date(canonical);
+  if (Number.isNaN(date.getTime()) || date.toISOString() !== canonical) return null;
+  // Vencimento é uma data civil; o fuso do aparelho não deve mudar o dia recebido.
+  return value.slice(0, 10).split("-").reverse().join("/");
+}
+
+function getPaymentsDescription(payments) {
+  const date = formatDueDate(payments?.nextChargeDueAt);
+  const statusLabels = {
+    scheduled: "Agendado", pending: "Aguardando pagamento", paid: "Pago",
+    failed: "Falhou", cancelled: "Cancelado", refunded: "Estornado",
+  };
+  const status = typeof payments?.latestStatus === "string" && Object.hasOwn(statusLabels, payments.latestStatus) ? `Último lançamento: ${statusLabels[payments.latestStatus]}`
+    : payments?.latestStatus === null ? "Nenhum lançamento informado" : "Situação do último lançamento indisponível";
+  return [
+    date ? `Vencimento informado: ${date}` : payments?.nextChargeDueAt === null ? "Nenhum vencimento informado" : "Vencimento indisponível",
+    status,
+    `Recorrência: ${payments?.recurrenceEnabled === true ? "ativa" : payments?.recurrenceEnabled === false ? "desativada" : "não informada"}`,
+  ].join("\n");
 }
 
 function ProgressBar({ percent = 0 }) {
@@ -282,7 +299,7 @@ function GiftCard({ gift }) {
 
 function InfoCard({ icon, title, description, footer, onPress }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.infoCard, pressed && { opacity: 0.86 }]}> 
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.infoCard, pressed && { opacity: 0.86 }]}>
       <View style={styles.infoIconWrap}>
         <MaterialCommunityIcons name={icon} size={27} color="#F1E6A8" />
       </View>
@@ -402,14 +419,6 @@ export default function SocioScreen({ navigation }) {
     ? "Brinde disponível para retirada na sede."
     : `${loyaltyData.paid}/${loyaltyData.total} mensalidades consecutivas para o brinde`;
 
-  const paymentsFooter = isActiveMember
-    ? payments.nextChargeLabel
-      ? `Próximo lançamento: ${payments.nextChargeLabel}`
-      : payments.subscriptionStatus
-        ? `Assinatura: ${payments.subscriptionStatus}`
-        : "Sem recorrência ativa no momento."
-    : "Regularização ainda sem checkout no app.";
-
   const benefitsFooter = !isActiveMember
     ? "Benefícios bloqueados até ativação ou regularização."
     : gift
@@ -504,9 +513,9 @@ export default function SocioScreen({ navigation }) {
 
               <InfoCard
                 icon="credit-card-outline"
-                title={payments.title}
-                description={payments.description}
-                footer={paymentsFooter}
+                title="Pagamentos"
+                description={getPaymentsDescription(payments)}
+                footer={isActiveMember ? "Ver histórico de demonstração" : "Pagamento pelo app ainda indisponível."}
                 onPress={() => isActiveMember
                   ? navigation.navigate("Payments", { initialTab: "history" })
                   : Alert.alert("Pagamentos", "A regularização financeira será conectada em uma etapa futura.")}
