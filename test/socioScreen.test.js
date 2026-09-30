@@ -235,3 +235,116 @@ test("histórico acessível pela área do sócio identifica exemplos e permite v
   await fireEvent.press(screen.getByText("Voltar"));
   expect(screen.getByText("Área do sócio")).toBeOnTheScreen();
 });
+
+function chargeTiming(fields = {}) {
+  return {
+    chargeId: "11", chargeStatus: "pending", dueDate: "2026-05-10", asOfDate: "2026-05-13",
+    timeZone: "America/Sao_Paulo", daysOverdue: 3, phase: "grace_period",
+    firstReminderDate: "2026-05-11", lastReminderDate: "2026-05-17", inactiveDate: "2026-05-18",
+    ...fields,
+  };
+}
+
+test("mostra o calendário de uma cobrança antiga sem confundir com o último lançamento pago", async () => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : {
+    ...summary("socio_ativo"),
+    payments: { nextChargeDueAt: "2026-06-10", latestStatus: "paid", recurrenceEnabled: true, chargeTiming: chargeTiming() },
+  }));
+  await renderArea();
+  expect(screen.getByText(/Cobrança registrada nº 11/)).toBeOnTheScreen();
+  expect(screen.getByText(/Vencimento desta cobrança: 10\/05\/2026/)).toBeOnTheScreen();
+  expect(screen.getByText(/3 dias de atraso nesta cobrança/)).toBeOnTheScreen();
+  expect(screen.getByText(/Prazo de tolerância desta cobrança: até 17\/05\/2026/)).toBeOnTheScreen();
+  expect(screen.getByText(/Situação em 13\/05\/2026 — São Paulo/)).toBeOnTheScreen();
+  expect(screen.getByText(/Vencimento informado: 10\/06\/2026/)).toBeOnTheScreen();
+  expect(screen.getByText(/Último lançamento: Pago/)).toBeOnTheScreen();
+  expect(screen.getByText("Sócio ativo")).toBeOnTheScreen();
+});
+
+test("retorno à tela atualiza o calendário recebido sem mudar o estado associativo", async () => {
+  let timing = chargeTiming();
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : {
+    ...summary("nao_socio"), payments: { chargeTiming: timing },
+  }));
+  const navigation = await renderArea();
+  expect(screen.getByText(/3 dias de atraso nesta cobrança/)).toBeOnTheScreen();
+  await act(async () => navigation.navigate("Home"));
+  timing = chargeTiming({ asOfDate: "2026-05-18", daysOverdue: 8, phase: "grace_expired" });
+  await act(async () => navigation.goBack());
+  expect(screen.getByText(/8 dias de atraso nesta cobrança/)).toBeOnTheScreen();
+  expect(screen.getByText("Não sócio")).toBeOnTheScreen();
+  expect(screen.queryByText(/3 dias de atraso nesta cobrança/)).toBeNull();
+});
+
+test("falha ao voltar à tela descarta o calendário anterior e oferece nova tentativa", async () => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : {
+    ...summary("socio_ativo"), payments: { chargeTiming: chargeTiming() },
+  }));
+  const navigation = await renderArea();
+  expect(screen.getByText(/Cobrança registrada nº 11/)).toBeOnTheScreen();
+  await act(async () => navigation.navigate("Home"));
+  api.defaults.adapter = jest.fn(async () => { throw new Error("Rede indisponível no teste"); });
+  await act(async () => navigation.goBack());
+  expect(screen.queryByText(/Cobrança registrada nº/)).toBeNull();
+  expect(screen.queryByText(/dias de atraso nesta cobrança/)).toBeNull();
+  expect(screen.queryByText("Não sócio")).toBeNull();
+  expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeOnTheScreen();
+});
+
+test.each([
+  ["not_overdue", 0, "2026-05-09", "scheduled", "Sem atraso nesta cobrança"],
+  ["not_overdue", 0, "2026-05-10", "pending", "Sem atraso nesta cobrança"],
+  ["grace_period", 1, "2026-05-11", "failed", "1 dia de atraso nesta cobrança"],
+  ["grace_period", 7, "2026-05-17", "pending", "7 dias de atraso nesta cobrança"],
+  ["grace_expired", 8, "2026-05-18", "failed", "Prazo de tolerância desta cobrança encerrado em 17/05/2026"],
+])("apresenta a fase %s com %i dias na data de referência do servidor", async (phase, daysOverdue, asOfDate, chargeStatus, text) => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : {
+    ...summary("socio_ativo"),
+    payments: { chargeTiming: chargeTiming({ phase, daysOverdue, asOfDate, chargeStatus }) },
+  }));
+  await renderArea();
+  expect(screen.getByText(new RegExp(text))).toBeOnTheScreen();
+  expect(screen.getByText(new RegExp(`Situação em ${asOfDate.split("-").reverse().join("/")} — São Paulo`))).toBeOnTheScreen();
+  expect(screen.getByText("Sócio ativo")).toBeOnTheScreen();
+  expect(screen.queryByText(/será inativad|inativação em|benefícios bloqueados/i)).toBeNull();
+});
+
+test.each([
+  [undefined, "Calendário da cobrança indisponível"],
+  [null, "Nenhuma cobrança em aberto informada"],
+  [{}, "Calendário da cobrança indisponível"],
+])("distingue calendário ausente, sem cobrança e incompleto: %j", async (timing, text) => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : {
+    ...summary("socio_inativo"),
+    payments: { nextChargeDueAt: "2026-06-10", latestStatus: "paid", recurrenceEnabled: false, chargeTiming: timing },
+  }));
+  await renderArea();
+  expect(screen.getByText(new RegExp(text))).toBeOnTheScreen();
+  expect(screen.getByText(/Último lançamento: Pago/)).toBeOnTheScreen();
+  expect(screen.getByText(/Recorrência: desativada/)).toBeOnTheScreen();
+  expect(screen.getByText("Sócio inativo")).toBeOnTheScreen();
+  expect(screen.queryByText(/em dia|todas as cobranças pagas/i)).toBeNull();
+});
+
+test.each([
+  { chargeId: [11] }, { chargeId: { toString: null, valueOf: null } }, { chargeId: 9007199254740992 },
+  { phase: "desconhecida" }, { chargeStatus: "paid" }, { timeZone: "UTC" },
+  { dueDate: "2026-02-30" }, { dueDate: "2026-05-10T00:00:00.000Z" },
+  { asOfDate: "ontem" }, { lastReminderDate: null },
+  { daysOverdue: "3" }, { daysOverdue: 1.5 }, { daysOverdue: -1 }, { daysOverdue: 90 },
+  { phase: "not_overdue", daysOverdue: 3 },
+  { phase: "not_overdue", daysOverdue: 0 },
+  { daysOverdue: 0 }, { asOfDate: "2026-05-18", daysOverdue: 8 },
+  { phase: "grace_expired" }, { lastReminderDate: "2026-05-09" },
+])("calendário inválido ou contraditório fica indisponível sem afetar outros dados: %j", async (fields) => {
+  api.defaults.adapter = jest.fn(async (config) => response(config, config.url.endsWith("/plans") ? { plans: [] } : {
+    ...summary("socio_ativo"),
+    payments: { nextChargeDueAt: "2026-06-10", latestStatus: "paid", recurrenceEnabled: true, chargeTiming: chargeTiming(fields) },
+  }));
+  await renderArea();
+  expect(screen.getByText(/Calendário da cobrança indisponível/)).toBeOnTheScreen();
+  expect(screen.queryByText(/Cobrança registrada nº/)).toBeNull();
+  expect(screen.getByText(/Vencimento informado: 10\/06\/2026/)).toBeOnTheScreen();
+  expect(screen.getByText(/Último lançamento: Pago/)).toBeOnTheScreen();
+  expect(screen.getByText("Sócio ativo")).toBeOnTheScreen();
+});

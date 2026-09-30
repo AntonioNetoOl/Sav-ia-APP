@@ -135,6 +135,43 @@ function formatDueDate(value) {
   return value.slice(0, 10).split("-").reverse().join("/");
 }
 
+function getChargeTimingDescription(timing) {
+  if (timing === null) return "Nenhuma cobrança em aberto informada";
+  const unavailable = "Calendário da cobrança indisponível";
+  if (!timing || !["not_overdue", "grace_period", "grace_expired"].includes(timing.phase)) return unavailable;
+  const [dueDate, asOfDate, lastReminderDate] = [timing.dueDate, timing.asOfDate, timing.lastReminderDate]
+    .map((value) => typeof value === "string" && value.length === 10 ? formatDueDate(value) : null);
+  const validId = typeof timing.chargeId === "string" ? /^[1-9]\d*$/.test(timing.chargeId)
+    : Number.isSafeInteger(timing.chargeId) && timing.chargeId > 0;
+  if (!dueDate || !asOfDate || !validId ||
+    !["scheduled", "pending", "failed"].includes(timing.chargeStatus) ||
+    timing.timeZone !== "America/Sao_Paulo" ||
+    !Number.isSafeInteger(timing.daysOverdue) || timing.daysOverdue < 0) return unavailable;
+
+  const elapsedDays = (Date.parse(`${timing.asOfDate}T00:00:00.000Z`) - Date.parse(`${timing.dueDate}T00:00:00.000Z`)) / 86400000;
+  if (timing.daysOverdue !== Math.max(0, elapsedDays)) return unavailable;
+
+  if (timing.phase === "not_overdue") {
+    if (timing.daysOverdue !== 0 || timing.asOfDate > timing.dueDate) return unavailable;
+  } else if (!lastReminderDate || timing.dueDate >= timing.lastReminderDate || timing.daysOverdue === 0 ||
+    timing.asOfDate <= timing.dueDate ||
+    (timing.phase === "grace_period" && timing.asOfDate > timing.lastReminderDate) ||
+    (timing.phase === "grace_expired" && timing.asOfDate <= timing.lastReminderDate)) return unavailable;
+
+  const overdue = `${timing.daysOverdue} dia${timing.daysOverdue === 1 ? "" : "s"} de atraso nesta cobrança`;
+  const phaseDescription = timing.phase === "not_overdue" ? "Sem atraso nesta cobrança"
+    : `${overdue}\n${timing.phase === "grace_period"
+      ? `Prazo de tolerância desta cobrança: até ${lastReminderDate}`
+      : `Prazo de tolerância desta cobrança encerrado em ${lastReminderDate}`}`;
+
+  return [
+    `Cobrança registrada nº ${timing.chargeId}`,
+    `Vencimento desta cobrança: ${dueDate}`,
+    phaseDescription,
+    `Situação em ${asOfDate} — São Paulo`,
+  ].join("\n");
+}
+
 function getPaymentsDescription(payments) {
   const date = formatDueDate(payments?.nextChargeDueAt);
   const statusLabels = {
@@ -147,7 +184,7 @@ function getPaymentsDescription(payments) {
     date ? `Vencimento informado: ${date}` : payments?.nextChargeDueAt === null ? "Nenhum vencimento informado" : "Vencimento indisponível",
     status,
     `Recorrência: ${payments?.recurrenceEnabled === true ? "ativa" : payments?.recurrenceEnabled === false ? "desativada" : "não informada"}`,
-  ].join("\n");
+  ].join("\n") + `\n\n${getChargeTimingDescription(payments?.chargeTiming)}`;
 }
 
 function ProgressBar({ percent = 0 }) {
