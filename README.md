@@ -87,7 +87,7 @@ Com Node.js 22 e as dependências do lockfile instaladas (`npm ci`), execute `np
 
 Os 63 testes renderizam a tela e a navegação, simulando apenas HTTP, armazenamento e recursos nativos do ambiente de testes. Cobrem falha do resumo, carregamento, nova tentativa, resposta inválida, sessão expirada, retorno ao login, troca de sessão e respostas atrasadas. Também preservam os três estados associativos válidos e o tratamento separado de falhas do catálogo de planos. Validam a apresentação de vencimento, último lançamento, recorrência e calendário da cobrança: três fases, dados ausentes/nulos/inválidos, atualização ao voltar à tela e descarte de dados antigos após erro. Incluem navegação para o histórico de demonstração e de volta. Não acessam o backend nem o banco e não substituem testes em dispositivo Android/iOS.
 
-A tela recarrega ao ganhar foco e descarta o resumo ao sair ou iniciar outra consulta. Erros não são apresentados como `nao_socio`; os botões de associação só aparecem após um resumo válido. Um `401` remove apenas o token usado pela requisição, para que respostas antigas não encerrem uma sessão nova.
+A tela recarrega ao ganhar foco e descarta o resumo ao sair ou iniciar outra consulta. Erros não são apresentados como `nao_socio`; o catálogo só aparece após um resumo válido para não sócio ou sócio inativo. Os cartões apresentam os dados reais dos planos para consulta, sem botão de adesão/seleção enquanto esse fluxo não estiver conectado. Um `401` remove apenas o token usado pela requisição, para que respostas antigas não encerrem uma sessão nova.
 
 ## Pagamentos na área do sócio
 

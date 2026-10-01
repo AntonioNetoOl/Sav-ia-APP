@@ -41,7 +41,7 @@ test("falha de resumo não apresenta não sócio nem chamada de associação", a
   await renderArea();
   await act(async () => {});
   expect(screen.queryByText("Não sócio")).toBeNull();
-  expect(screen.queryByText("Conhecer planos")).toBeNull();
+  expect(screen.queryByText("Planos disponíveis")).toBeNull();
   expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeOnTheScreen();
 });
 
@@ -61,11 +61,11 @@ test("nova tentativa oculta ações enquanto carrega e aceita não sócio válid
     : new Promise((resolve) => { finish = () => resolve(response(config, summary())); }));
   await fireEvent.press(screen.getByRole("button", { name: "Tentar novamente" }));
   expect(screen.getByLabelText("Carregando associação")).toBeOnTheScreen();
-  expect(screen.queryByText("Conhecer planos")).toBeNull();
+  expect(screen.queryByText("Planos disponíveis")).toBeNull();
   expect(screen.queryByRole("button", { name: "Tentar novamente" })).toBeNull();
   await act(async () => finish());
   expect(await screen.findByText("Não sócio")).toBeOnTheScreen();
-  expect(screen.getByText("Conhecer planos")).toBeOnTheScreen();
+  expect(screen.getByText("Planos disponíveis")).toBeOnTheScreen();
 });
 
 test("401 mostra sessão expirada e oferece retorno ao login", async () => {
@@ -75,7 +75,7 @@ test("401 mostra sessão expirada e oferece retorno ao login", async () => {
   });
   await renderArea();
   expect(await screen.findByText("Sua sessão expirou. Entre novamente para consultar sua associação.")).toBeOnTheScreen();
-  expect(screen.queryByText("Conhecer planos")).toBeNull();
+  expect(screen.queryByText("Planos disponíveis")).toBeNull();
   await fireEvent.press(screen.getByRole("button", { name: "Entrar novamente" }));
   expect(await screen.findByText("Login de teste")).toBeOnTheScreen();
   expect(await AsyncStorage.getItem("token")).toBeNull();
