@@ -99,28 +99,6 @@ function getStatusTheme(memberStatus) {
   };
 }
 
-function getAssociationAction(memberStatus) {
-  if (memberStatus === "socio_inativo") {
-    return {
-      eyebrow: "Regularização",
-      title: "Regularizar associação",
-      description: "Sua associação está inativa. Escolha um plano para voltar a acessar benefícios de sócio ativo quando o fluxo financeiro for liberado.",
-      buttonLabel: "Ver planos disponíveis",
-      alertTitle: "Regularizar associação",
-      alertMessage: "A escolha de plano já usa dados reais. A próxima etapa será conectar esse fluxo à criação de assinatura/cobrança, sem gateway real por enquanto.",
-    };
-  }
-
-  return {
-    eyebrow: "Associação",
-    title: "Conheça os planos Savóia",
-    description: "Associe-se para acompanhar plano, pagamentos, benefícios e fidelidade pelo app.",
-    buttonLabel: "Conhecer planos",
-    alertTitle: "Associar-se",
-    alertMessage: "Os planos já são carregados do backend. A próxima etapa será criar o fluxo de escolha do plano, ainda sem checkout real.",
-  };
-}
-
 function formatPercent(value) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? Math.round(number) : 0;
@@ -135,6 +113,43 @@ function formatDueDate(value) {
   return value.slice(0, 10).split("-").reverse().join("/");
 }
 
+function getChargeTimingDescription(timing) {
+  if (timing === null) return "Nenhuma cobrança em aberto informada";
+  const unavailable = "Calendário da cobrança indisponível";
+  if (!timing || !["not_overdue", "grace_period", "grace_expired"].includes(timing.phase)) return unavailable;
+  const [dueDate, asOfDate, lastReminderDate] = [timing.dueDate, timing.asOfDate, timing.lastReminderDate]
+    .map((value) => typeof value === "string" && value.length === 10 ? formatDueDate(value) : null);
+  const validId = typeof timing.chargeId === "string" ? /^[1-9]\d*$/.test(timing.chargeId)
+    : Number.isSafeInteger(timing.chargeId) && timing.chargeId > 0;
+  if (!dueDate || !asOfDate || !validId ||
+    !["scheduled", "pending", "failed"].includes(timing.chargeStatus) ||
+    timing.timeZone !== "America/Sao_Paulo" ||
+    !Number.isSafeInteger(timing.daysOverdue) || timing.daysOverdue < 0) return unavailable;
+
+  const elapsedDays = (Date.parse(`${timing.asOfDate}T00:00:00.000Z`) - Date.parse(`${timing.dueDate}T00:00:00.000Z`)) / 86400000;
+  if (timing.daysOverdue !== Math.max(0, elapsedDays)) return unavailable;
+
+  if (timing.phase === "not_overdue") {
+    if (timing.daysOverdue !== 0 || timing.asOfDate > timing.dueDate) return unavailable;
+  } else if (!lastReminderDate || timing.dueDate >= timing.lastReminderDate || timing.daysOverdue === 0 ||
+    timing.asOfDate <= timing.dueDate ||
+    (timing.phase === "grace_period" && timing.asOfDate > timing.lastReminderDate) ||
+    (timing.phase === "grace_expired" && timing.asOfDate <= timing.lastReminderDate)) return unavailable;
+
+  const overdue = `${timing.daysOverdue} dia${timing.daysOverdue === 1 ? "" : "s"} de atraso nesta cobrança`;
+  const phaseDescription = timing.phase === "not_overdue" ? "Sem atraso nesta cobrança"
+    : `${overdue}\n${timing.phase === "grace_period"
+      ? `Prazo de tolerância desta cobrança: até ${lastReminderDate}`
+      : `Prazo de tolerância desta cobrança encerrado em ${lastReminderDate}`}`;
+
+  return [
+    `Cobrança registrada nº ${timing.chargeId}`,
+    `Vencimento desta cobrança: ${dueDate}`,
+    phaseDescription,
+    `Situação em ${asOfDate} — São Paulo`,
+  ].join("\n");
+}
+
 function getPaymentsDescription(payments) {
   const date = formatDueDate(payments?.nextChargeDueAt);
   const statusLabels = {
@@ -147,7 +162,7 @@ function getPaymentsDescription(payments) {
     date ? `Vencimento informado: ${date}` : payments?.nextChargeDueAt === null ? "Nenhum vencimento informado" : "Vencimento indisponível",
     status,
     `Recorrência: ${payments?.recurrenceEnabled === true ? "ativa" : payments?.recurrenceEnabled === false ? "desativada" : "não informada"}`,
-  ].join("\n");
+  ].join("\n") + `\n\n${getChargeTimingDescription(payments?.chargeTiming)}`;
 }
 
 function ProgressBar({ percent = 0 }) {
@@ -205,33 +220,11 @@ function PlanCard({ plan }) {
   );
 }
 
-function AssociationActionCard({ memberStatus, onPress }) {
-  const action = getAssociationAction(memberStatus);
-
+function AvailablePlanCard({ plan }) {
   return (
-    <View style={styles.actionCard}>
-      <View style={styles.actionIconWrap}>
-        <MaterialCommunityIcons name="account-heart-outline" size={30} color="#F1E6A8" />
-      </View>
-      <View style={styles.actionTextBlock}>
-        <Text style={styles.actionEyebrow}>{action.eyebrow}</Text>
-        <Text style={styles.actionTitle}>{action.title}</Text>
-        <Text style={styles.actionDescription}>{action.description}</Text>
-        <Pressable onPress={onPress} style={({ pressed }) => [styles.primaryButton, pressed && { opacity: 0.86 }]}> 
-          <Text style={styles.primaryButtonText}>{action.buttonLabel}</Text>
-          <Ionicons name="arrow-forward" size={16} color="#123D2A" />
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function AvailablePlanCard({ plan, onPress }) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.availablePlanCard, pressed && { opacity: 0.9 }]}> 
+    <View style={styles.availablePlanCard}>
       <View style={styles.availablePlanHeader}>
         <View style={styles.planTitleBlock}>
-          <Text style={styles.planEyebrow}>Plano disponível</Text>
           <Text style={styles.availablePlanTitle}>{plan.name}</Text>
         </View>
         <View style={styles.availablePriceBadge}>
@@ -246,20 +239,15 @@ function AvailablePlanCard({ plan, onPress }) {
       </View>
 
       {!!plan.giftDescription && <Text style={styles.planGift}>{plan.giftDescription}</Text>}
-
-      <View style={styles.availablePlanFooter}>
-        <Text style={styles.availablePlanFooterText}>Selecionar plano</Text>
-        <Ionicons name="chevron-forward" size={16} color="#0C6A3D" />
-      </View>
-    </Pressable>
+    </View>
   );
 }
 
-function AvailablePlansSection({ plans, plansError, onPlanPress }) {
+function AvailablePlansSection({ plans, plansError }) {
   return (
     <View style={styles.plansSection}>
       <Text style={styles.sectionTitle}>Planos disponíveis</Text>
-      <Text style={styles.sectionSubtitle}>Valores, descontos e brindes vêm do backend.</Text>
+      <Text style={styles.sectionSubtitle}>Compare os valores e benefícios. A adesão, a reativação e o pagamento pelo app ainda não estão disponíveis.</Text>
 
       {plansError && (
         <View style={styles.warningBox}>
@@ -271,12 +259,12 @@ function AvailablePlansSection({ plans, plansError, onPlanPress }) {
       {!plansError && plans.length === 0 && (
         <View style={styles.emptyPlansBox}>
           <Text style={styles.emptyPlansTitle}>Nenhum plano disponível</Text>
-          <Text style={styles.emptyPlansText}>Quando a Savóia ativar planos no backend, eles aparecerão aqui.</Text>
+          <Text style={styles.emptyPlansText}>Consulte novamente mais tarde.</Text>
         </View>
       )}
 
       {plans.map((plan) => (
-        <AvailablePlanCard key={plan.code || String(plan.id)} plan={plan} onPress={() => onPlanPress(plan)} />
+        <AvailablePlanCard key={plan.code || String(plan.id)} plan={plan} />
       ))}
     </View>
   );
@@ -427,18 +415,6 @@ export default function SocioScreen({ navigation }) {
         ? `${formatPercent(benefits.storeDiscountPercent)}% de desconto nas lojas`
         : "Nenhum benefício ativo no momento.";
 
-  const handleAssociationAction = useCallback(() => {
-    const action = getAssociationAction(summary?.memberStatus);
-    Alert.alert(action.alertTitle, action.alertMessage);
-  }, [summary?.memberStatus]);
-
-  const handlePlanPress = useCallback((selectedPlan) => {
-    Alert.alert(
-      selectedPlan?.name || "Plano",
-      "Plano carregado do backend. A próxima etapa será criar a intenção de associação/regularização sem gateway real."
-    );
-  }, []);
-
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={SCREEN_BG} />
@@ -475,7 +451,7 @@ export default function SocioScreen({ navigation }) {
           <>
             <StatusCard summary={summary} />
 
-            {isActiveMember ? (
+            {isActiveMember && (
               <>
                 <PlanCard plan={plan} />
                 <GiftCard gift={gift} />
@@ -492,12 +468,10 @@ export default function SocioScreen({ navigation }) {
                   <Text style={styles.loyaltyFooter}>{loyaltyFooter}</Text>
                 </View>
               </>
-            ) : (
-              <AssociationActionCard memberStatus={summary.memberStatus} onPress={handleAssociationAction} />
             )}
 
             {shouldShowPlanOptions && (
-              <AvailablePlansSection plans={availablePlans} plansError={plansError} onPlanPress={handlePlanPress} />
+              <AvailablePlansSection plans={availablePlans} plansError={plansError} />
             )}
 
             <View style={styles.section}>
@@ -606,21 +580,6 @@ const styles = StyleSheet.create({
   planPillsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
   planPill: { backgroundColor: "rgba(12,106,61,0.10)", color: "#123D2A", borderRadius: 999, overflow: "hidden", paddingHorizontal: 10, paddingVertical: 6, fontSize: 12, fontWeight: "900" },
   planGift: { color: "rgba(18,61,42,0.70)", fontSize: 13, lineHeight: 18, fontWeight: "800", marginTop: 11 },
-  actionCard: {
-    marginTop: 14,
-    borderRadius: 24,
-    backgroundColor: "rgba(247,250,245,0.92)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-    padding: 17,
-    flexDirection: "row",
-    gap: 13,
-  },
-  actionIconWrap: { width: 52, height: 52, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(12,106,61,0.92)" },
-  actionTextBlock: { flex: 1 },
-  actionEyebrow: { color: "rgba(18,61,42,0.56)", fontSize: 11, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
-  actionTitle: { color: "#123D2A", fontSize: 21, fontWeight: "900", marginTop: 4 },
-  actionDescription: { color: "rgba(18,61,42,0.70)", fontSize: 13, lineHeight: 19, fontWeight: "800", marginTop: 6 },
   primaryButton: { marginTop: 13, alignSelf: "flex-start", borderRadius: 999, backgroundColor: "#F1E6A8", paddingHorizontal: 14, paddingVertical: 9, flexDirection: "row", alignItems: "center", gap: 7 },
   primaryButtonText: { color: "#123D2A", fontSize: 13, fontWeight: "900" },
   plansSection: { marginTop: 18 },
@@ -638,8 +597,6 @@ const styles = StyleSheet.create({
   availablePriceBadge: { backgroundColor: "rgba(12,106,61,0.10)", borderRadius: 16, paddingHorizontal: 11, paddingVertical: 8, alignItems: "center" },
   availablePlanPrice: { color: "#0C6A3D", fontSize: 14, fontWeight: "900" },
   availablePlanPriceSub: { color: "rgba(18,61,42,0.55)", fontSize: 10, fontWeight: "800", marginTop: 1 },
-  availablePlanFooter: { borderTopWidth: 1, borderTopColor: "rgba(18,61,42,0.08)", marginTop: 13, paddingTop: 11, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  availablePlanFooterText: { color: "#0C6A3D", fontSize: 13, fontWeight: "900" },
   emptyPlansBox: { borderRadius: 18, backgroundColor: "rgba(247,250,245,0.86)", padding: 14, marginBottom: 12 },
   emptyPlansTitle: { color: "#123D2A", fontSize: 15, fontWeight: "900" },
   emptyPlansText: { color: "rgba(18,61,42,0.65)", fontSize: 12, lineHeight: 17, fontWeight: "700", marginTop: 4 },
